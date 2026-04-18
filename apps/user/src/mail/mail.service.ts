@@ -18,14 +18,17 @@ export class MailService {
     }
 
     async sendMail(to: string, subject: string, text: string, html?: string) {
-        console.log(this.configService.get("EMAIL_USER"))
-        const info = await this.transporter.sendMail({
-            from: `"Telli" <${process.env.EMAIL_USER}>`,
-            to,
-            replyTo: "peterolanrewaju22+resoucepro@gmail.com",
-            subject,
-            html
-        });
-        // return info;
+        try {
+            const info = await this.transporter.sendMail({
+                from: `"Telli" <${process.env.EMAIL_USER}>`,
+                replyTo: "peterolanrewaju22+resoucepro@gmail.com",
+                to,
+                subject,
+                html
+            });
+            // return info;
+        } catch (err) {
+            throw new Error("MAIL_DELIVERY_FAILED");
+        }
     }
 }

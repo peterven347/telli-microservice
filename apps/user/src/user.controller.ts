@@ -1,4 +1,4 @@
-import { Controller } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Query } from '@nestjs/common';
 import { MessagePattern, Payload } from '@nestjs/microservices';
 import { UserService } from './user.service';
 import { EmailDto, LoginDto, PhoneNumbersDto, SignUpDto } from "@app/dtos/auth.dto"
@@ -43,13 +43,13 @@ export class UserController {
 	}
 
 	@MessagePattern({ cmd: "verify_phone_numbers" })
-	async handleVerifyPhoneNumbers(body: PhoneNumbersDto) {
-		return this.userService.verifyPhoneNumbers(body)
+	async handleVerifyPhoneNumbers(body: PhoneNumbersDto, userId: string) {
+		return this.userService.verifyPhoneNumbers(body, userId)
 	}
 
 	@MessagePattern({ cmd: "exit_domain" })
-	async handleExitDomain(domainId: string) {
-		return this.userService.exitDomain(domainId)
+	async handleExitDomain(domainId: string, userId: string) {
+		return this.userService.exitDomain(domainId, userId)
 	}
 
 	@MessagePattern({ cmd: "exit_sector" })
@@ -63,7 +63,24 @@ export class UserController {
 	}
 
 	@MessagePattern({ cmd: "join_public_sector" })
-	async handleJoinPublicSector(sectorId: string, body: any) {
-		return this.userService.joinPublicector(sectorId)
+	async handleJoinPublicSector(sectorId: string, userId: string) {
+		return this.userService.joinPublicector(sectorId, userId)
 	}
+
+	//
+	@Get('find-one')
+	async findOne(@Query() query: any) {
+		const { email, select } = query;
+		return this.userService.findOne(
+			{ email },
+			select,
+		);
+	}
+
+	@Patch('update-many')
+	async updateMany(@Body() body: { filter: any; update: any }) {
+		const { filter, update } = body;
+		return this.userService.updateMany(filter, update);
+	}
+
 }

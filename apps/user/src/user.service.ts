@@ -1,28 +1,31 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, Body, Inject } from '@nestjs/common';
 import { Model } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { SignOptions } from 'jsonwebtoken';
 import { InjectModel } from '@nestjs/mongoose';
 import { Redis } from 'ioredis';
 import * as bcrypt from 'bcryptjs';
+import * as os from 'os';
 import { MailService } from './mail/mail.service';
-import { Domain } from "@app/schemas/chat.schema";
-import { Sector } from "@app/schemas/sector.schema";
 import { User } from "@app/schemas/user.schema";
 import { EmailDto, LoginDto, PhoneNumbersDto, SignUpDto } from '@app/dtos/auth.dto';
 import { country_dial_codes } from 'country-dial-codes';
+import { REDIS_CLIENT } from 'apps/redis/redis.constants';
+import { lastValueFrom } from 'rxjs/internal/lastValueFrom';
+import { HttpService } from '@nestjs/axios';
+import { Public } from 'apps/gateway/src/auth/jwt-auth.guard';
 
 const pendingEmailsMap = new Map<string, any>();
-const url_domain = "localhost:3000/user/verify-email"
+const url_domain = `http://${getLocalIPAddress()}:3000`
 
 function generateToken(jwtService: JwtService, payload: any, options?: SignOptions): string {
-	// console.log(payload, options)
+
 	return jwtService.sign(payload, options);
-}
+};
 
 function verifyToken(jwtService: JwtService, payload: any, options?: SignOptions): any {
 	return jwtService.verify(payload, options);
-}
+};
 
 function cleanPhoneNumber(input: string) {
 	const number = input.trim().replace(/\D/g, '');
@@ -37,18 +40,32 @@ function cleanPhoneNumber(input: string) {
 	return number;
 };
 
+function getLocalIPAddress(): string {
+	const interfaces = os.networkInterfaces();
+	for (const name of Object.keys(interfaces)) {
+		const ifaceList = interfaces[name];
+		if (!ifaceList) continue;
+		for (const iface of ifaceList) {
+			if (iface.family === 'IPv4' && !iface.internal) {
+				return iface.address;
+			}
+		}
+	}
+
+	return '127.0.0.1';
+};
+
 @Injectable()
 export class UserService {
 	constructor(
 		@InjectModel(User.name) private userModel: Model<User>,
-		@InjectModel(Domain.name) private domainModel: Model<Domain>,
-		@InjectModel(Sector.name) private sectorModel: Model<Sector>,
-		private jwtService: JwtService,
+		@Inject(REDIS_CLIENT) private readonly redis: Redis,
+		private readonly httpService: HttpService,
 		private readonly mailService: MailService,
-		private readonly redisClient: Redis,
+		private jwtService: JwtService,
 	) { }
 
-	async getDelegates(delegates: string, id: any) {
+	async getDelegates (delegates: string, id: any){
 		const isNumeric = (i: string) => /^\+?\d+$/.test(i)
 		const _delegates = delegates.split(",")
 		const delegateList: string[] = []
@@ -71,11 +88,13 @@ export class UserService {
 		return user;
 	};
 
+	@Public()
 	async signUp(body: SignUpDto) {
 		const { email, password } = body
 		try {
-			const existingUser = await this.userModel.findOne({ email });
-			if (existingUser) throw new ConflictException('Email already exists');
+			const existingUser = pendingEmailsMap.has(email) || await this.userModel.exists({ email });
+			if (existingUser) return ({ success: false, message: "email already exists" });
+			// if (existingUser) throw new ConflictException('email already exists');
 
 			const hashedPassword = await bcrypt.hash(password, 10)
 			const newUser = new this.userModel({
@@ -83,11 +102,11 @@ export class UserService {
 				password: hashedPassword,
 			});
 
-			await newUser.save();
+			// await newUser.save();
 			pendingEmailsMap.set(email, newUser); //use redis instead
 
 			const token = generateToken(this.jwtService,
-				{ sub: newUser.id, email: email },
+				{ id: newUser.id, email: email },
 				{ expiresIn: '5m' }
 			);
 
@@ -95,9 +114,8 @@ export class UserService {
 				email,
 				"Verify your mail",
 				"",
-				`<p>Welcome! <a href="${url_domain}/api/user/verify-email?token=${token}">click to verify<a/></p>`
+				`<p>Welcome! <a href="${url_domain}/user/verify-email?token=${token}">click to verify</a></p>`
 			);
-
 			return ({ success: true })
 		} catch (err) {
 			console.log(err)
@@ -111,7 +129,6 @@ export class UserService {
 			const email = payload.email
 			let user = pendingEmailsMap.get(email)
 			if (user) {
-				user = user.property
 				await user.save()
 				pendingEmailsMap.delete(email)
 				return "Your email has been verified!, go back and login"
@@ -120,19 +137,19 @@ export class UserService {
 				if (saved) {
 					return "Your email has already been verified!, go back and login"
 				} else {
-					return "Please complete sign up click here"
+					return "Please complete sign up - click here"
 				}
 			}
 		} catch (err) {
 			console.log(err)
-			return { success: false, message: "an error occured" }
+			return "an error occured, please try again later."
 		}
 	};
 
 	async login(body: LoginDto) {
 		const { email, fcmToken } = body
 		try {
-			const user = await this.userModel.findOne({ email: email })
+			const user: any = await this.userModel.findOne({ email: email })
 			if (!user) return { success: false, message: "user does not exist" }
 
 			const isMatch = await bcrypt.compare(body.password, user.password);
@@ -141,7 +158,7 @@ export class UserService {
 			}
 
 			const accessToken = generateToken(this.jwtService,
-				{ id: user.id, email: user.email, first_name: user.first_name },
+				{ id: user.id, email: user.email },
 				{ expiresIn: "50m" }
 			)
 			// save refreshToken to redis here
@@ -149,7 +166,6 @@ export class UserService {
 				{ email: user.email, first_name: user.first_name },
 				{ expiresIn: "8h" }
 			)
-			// const refreshToken = this.jwtService.sign() has to useREFRESHACCESSTOKEN  secret
 			const userObject = user.toObject()
 			const { password, fcmTokens, ...rest } = userObject;
 			// await this.mailService.sendMail(
@@ -185,7 +201,7 @@ export class UserService {
 	async refreshAccessToken(body: any) {
 		try {
 			const decoded = verifyToken(this.jwtService, body.refreshToken)
-			const userSocketId = await this.redisClient.hget("usersSockets", decoded.id)
+			const userSocketId = await this.redis.hget("usersSockets", decoded.id)
 			console.log(userSocketId)
 			// const socket = userNameSpace.sockets.get(userSocketId);
 			// if (socket) {
@@ -196,7 +212,7 @@ export class UserService {
 				{ expiresIn: "50m" }
 			)
 			return { success: true, accessToken: accessToken }
-		} catch (err) {
+		} catch (err: any) {
 			if (err) {
 				if (err.name === "TokenExpiredError") return { success: false, message: "log in" }
 				console.log(err.name)
@@ -217,14 +233,12 @@ export class UserService {
 		}
 	};
 
-	async verifyPhoneNumbers(body: PhoneNumbersDto) {
+	async verifyPhoneNumbers(body: PhoneNumbersDto, userId: string) {
 		try {
-			// return { success: true, data: [] }
-			const user = await this.userModel.findOne({ email: "req.auth.email" }).select("_id")
 			const valid = (await Promise.all(
 				body.phoneNumbers.map(async (i: string) => {
-					const result = await this.userModel.findOne({ $and: [{ phone_number: cleanPhoneNumber(i) }, { _id: { $ne: user?._id } }] });
-					return result && { _id: result.id, number: i, logo: result.logo };
+					const result = await this.userModel.findOne({ $and: [{ phone_number: cleanPhoneNumber(i) }, { _id: { $ne: userId } }] });
+					return result && { _id: result.id, number: i, img: result.img, publicKey: result.publicKey };
 				})
 			)).filter(Boolean)
 			return { success: true, data: valid }
@@ -236,9 +250,9 @@ export class UserService {
 
 	async getUserProfileImg(body: any) {
 		try {
-			const user = await this.userModel.findOne({ phone_number: body.phoneNumber }).select("-_id logo")
+			const user = await this.userModel.findOne({ phone_number: body.phoneNumber }).select("-_id img")
 			if (user) {
-				return { success: true, data: { logo: user?.logo, phoneNumber: body.phoneNumber } }
+				return { success: true, data: { img: user?.img, phoneNumber: body.phoneNumber } }
 			} else {
 				return { success: false, message: "non found" }
 			}
@@ -247,10 +261,15 @@ export class UserService {
 		}
 	};
 
-	async exitDomain(domainId: string) {
+	async exitDomain(domainId: string, userId: string) {
 		try {
-			const user: any = await this.userModel.findOne({ email: "peterolanrewaju22@gmail.com" }).select("_id")
-			const domain = await this.domainModel.findById(domainId)
+			const user: any = await this.userModel.findById(userId)
+			const response = await lastValueFrom(
+				this.httpService.get(
+					`http://localhost:3002/domain/${domainId}`
+				)
+			);
+			const domain = response.data
 			if (!user || !domain) return { success: false, message: "not found" }
 			if (user._id.equals(domain.creator_id)) return { success: false, message: "creator" }
 			await this.userModel.updateOne(
@@ -267,8 +286,17 @@ export class UserService {
 	async removeUser(sectorId: string, body: any) {
 		try {
 			const person = await this.userModel.findOne({ phone_number: body.delegate }, { _id: 1 })
-			const user = await this.userModel.findOne({ email: "peterolanrewaju22@gmail.com" }, { _id: 1 })
-			const sector = await this.sectorModel.findById(sectorId, { _id: 0, creator_id: 1, domain_id: 1 })
+			const user = await this.userModel.findOne({ email: body.email }, { _id: 1 })
+			const response = await lastValueFrom(
+				this.httpService.get(
+					`http://localhost:3002/sector/${sectorId}`,
+					{
+						params: { _id: 0, creator_id: 1, domain_id: 1 },
+					}
+				)
+			);
+
+			const sector = response.data;
 			// if (user._id.equals(sector?.creator_id)) {
 			const result = await this.userModel.updateOne(
 				{ _id: person?._id },
@@ -302,7 +330,7 @@ export class UserService {
 	};
 
 	async addUserToSector(sectorId: string, body: any) {
-		async function getDelegates(delegates: string, id: any) {
+		const getDelegates = async (delegates: string, id: any) => {
 			const isNumeric = (i: any) => /^\+?\d+$/.test(i)
 			const _delegates = delegates.split(",")
 			let delegateList = []
@@ -319,9 +347,18 @@ export class UserService {
 		};
 
 		try {
-			const sector = await this.sectorModel.findById(sectorId)
+			const response = await lastValueFrom(
+				this.httpService.get(
+					`http://localhost:3002/sector/${sectorId}`,
+					{
+						params: { _id: 0, creator_id: 1, domain_id: 1 },
+					}
+				)
+			);
+
+			const sector = response.data;
 			if (!sector) return { success: false, "message": "sector not found" }
-			const user = await this.userModel.findOne({ email: "peterolanrewaju22@gmail.com" })
+			const user = await this.userModel.findOne({ email: body.email })
 			const { delegateList, delegateFcmToken } = await getDelegates(body.delegates, user?._id)
 			const adduser = await this.userModel.updateMany({ _id: { $in: delegateList } }, { $addToSet: { sectors: sector._id } })
 			const message = {
@@ -332,7 +369,18 @@ export class UserService {
 				},
 				data: { sector: JSON.stringify(sector) },
 			}
-			this.sectorModel.updateOne({ _id: sectorId }, { $addToSet: { members: { user: user?._id, role: "member" } } })
+			await lastValueFrom(
+				this.httpService.patch(
+					`http://localhost:3002/update-one`,
+					{
+						filter: { _id: sectorId },
+						update: {
+							$addToSet: {
+								members: { user: user?._id, role: 'member' },
+							},
+						},
+					}
+				))
 
 			// await fadmin.messaging().sendEachForMulticast(message);
 		} catch (err) {
@@ -341,15 +389,32 @@ export class UserService {
 		}
 	};
 
-	async joinPublicector(sectorId: string) {
+	async joinPublicector(sectorId: string, userId: string) {
 		try {
-			const sector = await this.sectorModel.exists({ _id: sectorId })
-			if (!sector) return { success: false, "message": "sector not found" }
-			const user = await this.userModel.findOneAndUpdate({ email: "peterolanrewaju22@gmail.com" }, { $addToSet: { sectors: sector._id } })
-			if (!user) return { success: false, "message": "user not found" }
-			this.sectorModel.updateOne({ _id: sectorId }, { $addToSet: { members: { user: user?._id, role: "member" } } })
+			const response = await lastValueFrom(
+				this.httpService.get(
+					`http://localhost:3002/${sectorId}/exists`
+				)
+			);
 
-			// const creatorSocketId = await redisClient.hGet("userSockets", user.id)
+			const sector = response.data;
+			if (!sector) return { success: false, "message": "sector not found" }
+			const user = await this.userModel.findByIdAndUpdate(userId, { $addToSet: { sectors: sector._id } })
+			if (!user) return { success: false, "message": "user not found" }
+			await lastValueFrom(
+				this.httpService.patch(
+					`http://localhost:3002/update-one`,
+					{
+						filter: { _id: sectorId },
+						update: {
+							$addToSet: {
+								members: { user: user?._id, role: 'member' },
+							},
+						},
+					}
+				))
+
+			// const creatorSocketId = await redis.hGet("userSockets", user.id)
 			// const socket = userNameSpace.sockets.get(creatorSocketId);
 			// if (socket) {
 			// 	socket.join(sector.id);
@@ -359,5 +424,13 @@ export class UserService {
 			console.log(err)
 			return { success: false, message: "an error occured" }
 		}
+	};
+
+	async findOne(email, select = "") {
+		return await this.userModel.findOne(email).select(select)
+	};
+
+	async updateMany(filter, update) {
+		return await this.userModel.updateMany(filter, update)
 	};
 }

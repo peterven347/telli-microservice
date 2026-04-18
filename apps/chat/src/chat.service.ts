@@ -1,12 +1,13 @@
-import { Body, Injectable, Param, Query } from '@nestjs/common';
-import { Redis } from 'ioredis';
 import mongoose, { Model } from 'mongoose';
+import { Injectable, Inject, Param, Query } from '@nestjs/common';
+import { Redis } from 'ioredis';
 import { InjectModel } from '@nestjs/mongoose';
-import { User } from '@app/schemas/user.schema';
+import { lastValueFrom } from 'rxjs';
+import { HttpService } from '@nestjs/axios';
 import { Domain } from "@app/schemas/chat.schema"
 import { Sector } from '@app/schemas/sector.schema';
-import { Message } from '@app/schemas/message.schema';
-import { SocketGateway } from 'apps/gateway/src/socket/socket.service';
+import { SocketGateway } from 'apps/socket/socket.service';
+import { REDIS_CLIENT } from 'apps/redis/redis.constants';
 
 function regexQuery(string: string) {
     const escapeRegex = string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -30,12 +31,11 @@ function cleanPhoneNumber(input: string) {
 @Injectable()
 export class ChatService {
     constructor(
-        private readonly redisClient: Redis,
-        private readonly socketGateWay: SocketGateway,
         @InjectModel(Domain.name) private chatModel: Model<Domain>,
         @InjectModel(Sector.name) private sectorModel: Model<Sector>,
-        @InjectModel(User.name) private userModel: Model<User>,
-        @InjectModel(Message.name) private mesageModel: Model<Message>
+        @Inject(REDIS_CLIENT) private readonly redisClient: Redis,
+        private readonly socketGateWay: SocketGateway,
+        private readonly httpService: HttpService,
     ) { }
 
     async emitNewDomainCreated(socketId: string, data: any) {
@@ -48,25 +48,45 @@ export class ChatService {
         this.socketGateWay.getSocketsByUserIdandJoinRoom(id, roomName);
     }
 
-
-    async getDelegates(delegates: string, id: any) {
+    async getDelegates(delegates: string, id: string) {
         const isNumeric = (i: string) => /^\+?\d+$/.test(i)
         const _delegates = delegates.split(",")
         const delegateList: string[] = []
         let delegateFcmToken: string[] = []
         for (let i of _delegates) {
-            const user = isNumeric(i) ? await this.userModel.findOne({ phone_number: cleanPhoneNumber(i) }) : await this.userModel.findOne({ email: i })
-            if (user !== null && user.id !== id) {
-                delegateList.push(user.id)
+
+    const user = (
+        await lastValueFrom(
+            this.httpService.get(`http://localhost:3004/find-one`,
+                {
+            params: isNumeric(i) ? { phone_number: cleanPhoneNumber(i) } : { email: i },
+            }),
+        )
+        ).data
+
+    if (user && user._id !== id) {
+                delegateList.push(user._id)
                 delegateFcmToken = delegateFcmToken.concat(user?.fcmTokens)
             }
         }
         return ({ delegateList: delegateList, delegateFcmToken: delegateFcmToken })
     };
 
-    async getDomain() {
+    async getDomain(userId: string) {
         try {
-            const user = await this.userModel.findOne({ email: "peterolanrewaju22@gmail.com" }).select("-fcmTokens")
+            const response = await lastValueFrom(
+            this.httpService.get(
+                `http://localhost:3004/find-one`,
+                {
+                params: {
+                    id: userId,
+                    select: '-fcmTokens',
+                },
+                },
+            ),
+            );
+
+            const user = response.data;
             if (!user) return { success: false, message: "user not found" }
             const sectors = await this.sectorModel.find({ $or: [{ _id: { $in: user.sectors } }, { creator_id: user._id }] })
             const domainId = [...new Set(sectors.map(i => i.domain_id.toString()))]
@@ -138,11 +158,22 @@ export class ChatService {
         }
     };
 
-    async getDomainBySector(sectorId: string) {
+    async getDomainBySector(sectorId: string, userId: string) {
         try {
-            const user = await this.userModel.findOne({ email: "petervenwest1@gmail.com" }).select("-fcmTokens")
-            if (!user) return { success: false, message: "no user found" }
+            const response = await lastValueFrom(
+            this.httpService.get(
+                `http://localhost:3004/find-one`,
+                {
+                params: {
+                    id: userId,
+                    select: '-fcmTokens',
+                },
+                },
+            ),
+            );
 
+            const user = response.data;
+            if (!user) return { success: false, message: "no user found" }
             const sectors = await this.sectorModel.findOne({
                 $and: [{ _id: sectorId }, { _id: { $nin: user.sectors }, status: "public" }]
             });
@@ -206,53 +237,58 @@ export class ChatService {
         }
     };
 
-    async findSector(sectorTitle: string) {
+    async findSector(sectorTitle: string, userId: string) {
         try {
-            const user = await this.userModel.findOne({ email: "peterolanrewaju22@gmail.com" }).select("sectors")
+            const response = await lastValueFrom(
+            this.httpService.get(
+                `http://localhost:3004/find-one`,
+                {
+                params: {
+                    id: userId,
+                    select: 'sectors',
+                },
+                },
+            ),
+            );
+
+            const user = response.data;
             if (!user) return { success: false, message: "no user" }
-            if (!sectorTitle) return { success: false, message: "no title" }
-            const sectors = await this.sectorModel.find({
-                $and: [
-                    { _id: { $nin: user.sectors } },
-                    { creator_id: { $ne: user._id } },
-                    { status: "public" },
-                    { title: { $regex: regexQuery(sectorTitle) } }
-                ]
-            }).limit(20).lean()
-            return { success: true, data: sectors }
-        } catch (err) {
-            console.log(err)
-        }
-    };
+                        if (!sectorTitle) return { success: false, message: "no title" }
+                        const sectors = await this.sectorModel.find({
+                            $and: [
+                                { _id: { $nin: user.sectors } },
+                                { creator_id: { $ne: user._id } },
+                                { status: "public" },
+                                { title: { $regex: regexQuery(sectorTitle) } }
+                            ]
+                        }).limit(20).lean()
+                        return { success: true, data: sectors }
+                    } catch (err) {
+                        console.log(err)
+                    }
+                };
 
-    async getMissedMessages(sectorId: string, skip: number) {
-        try {
-            const user = await this.userModel.findOne({ email: "req.auth.email" }).select("sectors")
-            if (!user) return { success: false }
-            const issue = await this.mesageModel.find({
-                $and: [{
-                    $or: [
-                        { sector_id: { $in: user.sectors } },
-                        { creator_id: user._id }
-                    ]
-                }, { sector_id: sectorId }]
-            }).sort({ _id: 1 }).skip(skip)
-            return { success: true, data: issue }
-        } catch (err) {
-            console.log(err)
-            return
-        }
-    };
-
-    async createDomain(payload: any) {
+    async createDomain(payload: any, userId: string) {
         const { domainName, status, title, delegates, file } = payload
         try {
-            const user = await this.userModel.findOne({ email: "peterolanrewaju22@gmail.com" })
+            const response = await lastValueFrom(
+            this.httpService.get(
+                `http://localhost:3004/find-one`,
+                {
+                params: {
+                    id: userId,
+                    select: '',
+                },
+                },
+            ),
+            );
+
+            const user = response.data;
             if (!user) return { success: false, message: "no user" }
             const newDomain = new this.chatModel({
-                domain: domainName.trim(),
+                name: domainName.trim(),
                 creator_id: user._id,
-                logo: file?.filename,
+                img: file?.filename,
             })
 
             const savedDomain = await newDomain.save()
@@ -262,71 +298,111 @@ export class ChatService {
                 title: title,
                 status: status,
                 //link: 
-                logo: file?.filename,
+                img: file?.filename,
                 members: [{ _id: user._id, role: "admin", public_key: "key" }]
             })
-            let domainObj: any = savedDomain.toObject()
-            domainObj.sectors = [newSector]
             //  store sector on redis
             if (status === "private") {
-                const { delegateList, delegateFcmToken } = await this.getDelegates(delegates, user._id)
+                const { delegateList, delegateFcmToken } = await this.getDelegates(delegates, user.id)
                 if (delegateList.length === 0) {
                     return { success: false, message: "add at least one valid delegate" }
                 }
-                await this.userModel.updateMany({ _id: { $in: delegateList } }, { $addToSet: { sectors: newSector._id } })
+                await this.httpService.patch(
+                    `http://localhost:3004/update-many`,
+                    {
+                    filter: { _id: { $in: delegateList } },
+                    update: {
+                        $addToSet: {
+                        sectors: newSector._id,
+                        },
+                    },
+                    },
+                );
+  
                 const message = {
                     tokens: delegateFcmToken.flat(),
                     notification: {
                         title: "Telli",
                         body: `You have been added to ${title} of (${domainName})`,
                     },
-                    data: { domain: JSON.stringify(domainObj[0]) }, // [0]??
+                    data: { domain: JSON.stringify({}) }, // [0]??
                 }
                 // await fadmin.messaging().sendEachForMulticast(message);
 
                 const socketIds = await this.redisClient.hmget("userSockets", ...delegateList);
-                socketIds.forEach((id: string) => {
+                socketIds.forEach((id: any) => {
                     if (!id) return
-                    this.emitNewDomainCreated(id, domainObj)
+                    this.emitNewDomainCreated(id, {})
                     this.joinRoom(id, newSector.id)
                 });
             }
-            return { success: true, data: domainObj }
+            return {
+                success: true,
+                    domain: savedDomain,
+                    sector: newSector,
+                    data: {
+                        _id: newSector._id,
+                        domain_id: savedDomain._id,
+                        sector_id: newSector._id,
+                        creator_id: user._id,
+                        createdAt: Date.now()
+                    }
+            }
         } catch (err) {
             console.log(err)
             return { success: false, message: "an error occured" }
         }
     };
 
-    async createSector(domainId: string, payload: any) {
-        const { status, title, delegates, file } = payload
+    async createSector(payload: any) {
+        const { domainId, status, title, delegates, file } = payload
         try {
-            const user = await this.userModel.findOne({ email: "req.auth.email" })
+            const response = await lastValueFrom(
+            this.httpService.get(
+                `http://localhost:3004/find-one`,
+                {
+                params: {
+                    email: "peterolanrewaju22@gmail.com",
+                    select: '',
+                },
+                },
+            ),
+            );
+
+            const user = response.data;
             const domain: any = await this.chatModel.findById(domainId)
             if (!domain) return { success: false, message: "no domain found" }
-            if (!domain?._id.equals(user?._id)) return { success: false, message: "unauthorised" } //allows only the creator to add more sectors
-            const sector = await this.sectorModel.exists({ domain_id: domain._id, title: title })
+            // if (!domain?._id.equals(user?._id)) return { success: false, message: "unauthorised" } //allows only the creator to add more sectors
+            const sector = await this.sectorModel.exists({ domain_id: domain.id, title: title })
             if (sector) return { success: false, message: "sector already exists" }
-            const newSector = new Sector({
+            const newSector = await this.sectorModel.create({
                 domain_id: domain._id,
                 creator_id: user?._id,
                 title: title,
                 status: status,
                 //link:
-                logo: file?.filename,
-                members: [{ user: user?._id, role: "admin", public_key: "key" }]
+                img: file?.filename,
+                members: [{ _id: user?._id, role: "admin", public_key: "key" }]
             })
-            await newSector.save()
             //  store sector on redis
             if (status === "private") {
-                const { delegateList, delegateFcmToken } = await this.getDelegates(delegates, user?._id)
+                const { delegateList, delegateFcmToken } = await this.getDelegates(delegates, user?.id)
                 if (delegateList.length === 0) {
                     return { success: false, message: "add at least one valid delegate" }
                 }
-                await this.userModel.updateMany({ _id: { $in: delegateList } }, { $addToSet: { sectors: newSector._id } })
+                await this.httpService.patch(`http://localhost:3004/update-many`,
+                    {
+                    filter: { _id: { $in: delegateList } },
+                    update: {
+                        $addToSet: {
+                        sectors: newSector._id,
+                        },
+                    },
+                    },
+                );
 
                 const socketIds = await this.redisClient.hmget("userSockets", ...delegateList);
-                socketIds.forEach((id: string) => {
+                socketIds.forEach((id: any) => {
                     if (!id) return
                     this.emitNewSectorCreated(id, newSector)
                     this.joinRoom(id, newSector.id)
@@ -342,16 +418,22 @@ export class ChatService {
                 }
                 // await fadmin.messaging().sendEachForMulticast(message);
             }
-            return { success: true, data: newSector }
+            return {
+                success: true,
+                sector: newSector,
+                data: {
+                    _id: newSector._id,
+                    domain_id: domainId,
+                    sector_id: newSector._id,
+                    creator_id: user?._id,
+                    createdAt: Date.now()
+                }
+            }
         } catch (err) {
             console.log(err)
             return { success: false, message: "an error occured" }
         }
-    }
-
-    // async sendMessage(){
-
-    // };
+    };
 
     async changeDomainHolder(@Param("domain_id") domainId: string, @Query("q") query: any, body: any) {
         query = query.setting.toUpperCase()
@@ -361,7 +443,19 @@ export class ChatService {
             return { success: false, message: "incomplete data" }
         }
         try {
-            const user = await this.userModel.findOne({ email: "petervenwest1@gmail.com" })
+            const response = await lastValueFrom(
+  this.httpService.get(
+    `http://localhost:3004/find-one`,
+    {
+      params: {
+        email: "peterolanrewaju22@gmail.com",
+        select: '',
+      },
+    },
+  ),
+);
+
+const user = response.data;
             if (!user) return { success: false, message: "user not found" }
             const domain = await this.chatModel.findOneAndUpdate({ _id: domainId, creator_id: user._id }, {
                 $set: {
@@ -388,7 +482,97 @@ export class ChatService {
         }
     };
 
-    async test() {
-        return { success: true }
+    //
+    async findByIdDomain(id: string, arg = {}){
+        return await this.chatModel.findById(id, arg)
     }
+
+    async findByIdSector(id: string, arg = {}){
+        return await this.sectorModel.findById(id)
+    }
+
+    async exists(arg){
+        return await this.sectorModel.exists(arg)
+    }
+
+    async updateOneSector(arg0, arg1){
+        return await this.sectorModel.updateOne(arg0, arg1)
+    }
+    //
 }
+
+    // async getMissedMessages(sectorId: string, skip: number) {
+    //     try {
+    //         const user = await this.userService.findOne({ email: "req.auth.email" }).select("sectors")
+    //         if (!user) return { success: false }
+    //         const issue = await this.mesageModel.find({
+    //             $and: [{
+    //                 $or: [
+    //                     { sector_id: { $in: user.sectors } },
+    //                     { creator_id: user._id }
+    //                 ]
+    //             }, { sector_id: sectorId }]
+    //         }).sort({ _id: 1 }).skip(skip)
+    //         return { success: true, data: issue }
+    //     } catch (err) {
+    //         console.log(err)
+    //         return
+    //     }
+    // }; 
+
+
+// async createDomain(payload: any) {
+    //     const { domainName, status, title, delegates, file } = payload
+    //     try {
+    //         const user = await this.userService.findOne({ email: "peterolanrewaju22@gmail.com" })
+    //         if (!user) return { success: false, message: "no user" }
+    //         const newDomain = new this.chatModel({
+    //             domain: domainName.trim(),
+    //             creator_id: user._id,
+    //             logo: file?.filename,
+    //         })
+
+    //         const savedDomain = await newDomain.save()
+    //         const newSector = await this.sectorModel.create({
+    //             domain_id: savedDomain._id,
+    //             creator_id: user._id,
+    //             title: title,
+    //             status: status,
+    //             //link: 
+    //             logo: file?.filename,
+    //             members: [{ _id: user._id, role: "admin", public_key: "key" }]
+    //         })
+    //         newSector.data = [{ _id: "gen_"+ newSector._id}]
+    //         let domainObj: any = savedDomain.toObject()
+    //         domainObj.sectors = [newSector]
+    //         //  store sector on redis
+    //         if (status === "private") {
+    //             const { delegateList, delegateFcmToken } = await this.getDelegates(delegates, user._id)
+    //             if (delegateList.length === 0) {
+    //                 return { success: false, message: "add at least one valid delegate" }
+    //             }
+    //             await this.userService.updateMany({ _id: { $in: delegateList } }, { $addToSet: { sectors: newSector._id } })
+    //             const message = {
+    //                 tokens: delegateFcmToken.flat(),
+    //                 notification: {
+    //                     title: "Telli",
+    //                     body: `You have been added to ${title} of (${domainName})`,
+    //                 },
+    //                 data: { domain: JSON.stringify(domainObj[0]) }, // [0]??
+    //             }
+    //             // await fadmin.messaging().sendEachForMulticast(message);
+
+    //             const socketIds = await this.redisClient.hmget("userSockets", ...delegateList);
+    //             socketIds.forEach((id: string) => {
+    //                 if (!id) return
+    //                 this.emitNewDomainCreated(id, domainObj)
+    //                 this.joinRoom(id, newSector.id)
+    //             });
+    //         }
+    //         console.log(domainObj)
+    //         return { success: true, data: domainObj }
+    //     } catch (err) {
+    //         console.log(err)
+    //         return { success: false, message: "an error occured" }
+    //     }
+    // };

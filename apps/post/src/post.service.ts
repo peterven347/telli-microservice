@@ -22,7 +22,6 @@ export class PostService {
 
 	async createPost(payload: any) {
 		try {
-			// console.log(payload)
 			const post = await this.postModel.create(
 				payload.file && payload.file.length >= 1 ?
 					{
@@ -36,7 +35,6 @@ export class PostService {
 						creator_id: "689b313009da3e3f85c3408c"
 					}
 			)
-			console.log(post)
 			return post
 		} catch (err) {
 			console.log(err)

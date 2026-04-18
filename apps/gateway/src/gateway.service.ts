@@ -1,20 +1,24 @@
-import { Inject, Injectable, NestMiddleware } from '@nestjs/common';
-import * as jwt from 'jsonwebtoken';
+import { Injectable, NestMiddleware } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Request, Response, NextFunction } from 'express';
-import { SignOptions } from 'jsonwebtoken';
+import { NextFunction } from 'express';
 
-const revoked_access_tokens: string[] = [] //will take up memory over time
-
-function verifyToken(jwtService: JwtService, payload: any, options?: SignOptions): any {
-	return jwtService.sign(payload, options);
-}
+const revoked_access_tokens: string[] = []; //will take up memory over time
 
 @Injectable()
 export class AuthService implements NestMiddleware {
 	constructor(private jwtService: JwtService) { }
-	async use(req: any, res: any, next: NextFunction) {
+	sign(user: any) {
+		return this.jwtService.sign({
+			sub: user._id,
+			email: user.email,
+		});
+	}
 
+	verify(token: string) {
+		return this.jwtService.verify(token);
+	}
+
+	async use(req: any, res: any, next: NextFunction) {
 		try {
 			const authHeader = req.get("Authorization")
 			if (!authHeader) {
@@ -28,30 +32,8 @@ export class AuthService implements NestMiddleware {
 				return req.auth
 			}
 
-			const tokenn = verifyToken(this.jwtService, token)
+			const tokenn = this.verify(token)
 			console.log("tokenn", tokenn)
-			// next()
-			// jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user: any) => {
-			// 	// console.log(req.method, req.path)
-			// 	if (err) {
-			// 		if (err.name === "TokenExpiredError") {
-			// 			req.auth = { exp: true }
-			// 			return res.json(req.auth)
-			// 		}
-			// 		req.auth = { exp: "invalid token" }
-			// 		console.log(1111)
-			// 		return res.json(req.auth)
-			// 	} else if (revoked) {
-			// 		console.log(1)
-			// 		revoked_access_tokens.push(token)
-			// 		req.auth = { exp: true }
-			// 		return res.json(req.auth)
-			// 	} else {
-			// 		req.auth = { email: user?.email }
-			// 		next()
-			// 	}
-			// })
-			req.auth = { email: "petervenwest1@gmail.com" }
 			next()
 		} catch (err) {
 			req.auth = { message: "Authentication error!" }

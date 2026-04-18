@@ -4,7 +4,7 @@ import { Server } from 'socket.io';
 @WebSocketGateway({ namespace: '/notifications', port: 3002 })
 export class NotificationGateway {
     @WebSocketServer()
-    server: Server;
+    server!: Server;
 
     @SubscribeMessage('notify')
     handleNotify(@MessageBody() data: string) {

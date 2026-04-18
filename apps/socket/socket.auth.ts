@@ -17,7 +17,6 @@ export function socketAuthMiddleware(server: Server): void {
 				}
 				if (typeof decoded === 'object' && decoded !== null) {
 					socket.data.userEmail = (decoded as { email: string }).email;
-					// socket.data.userEmail = (decoded as { email: string }).email;
 					next();
 				} else {
 					return next(new Error('invalid token payload'));
