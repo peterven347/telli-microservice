@@ -1,14 +1,9 @@
-<<<<<<< HEAD
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-=======
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 import { Kafka, Producer, Consumer } from 'kafkajs';
 
 @Injectable()
 export class KafkaService implements OnModuleInit, OnModuleDestroy {
-<<<<<<< HEAD
     private readonly logger = new Logger(KafkaService.name);
     private kafka!: Kafka;
     private producer!: Producer;
@@ -19,14 +14,6 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
     async onModuleInit() {
         const brokers = this.configService.get<string>('KAFKA_BROKER')?.split(',') ?? []
 
-=======
-    private kafka: Kafka;
-    private producer: Producer;
-    private consumer: Consumer;
-
-    async onModuleInit() {
-        const brokers = (process.env.KAFKA_BROKERS || '127.0.0.1:9092').split(',');
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
         this.kafka = new Kafka({
             clientId: 'chat-app',
             brokers,
@@ -41,7 +28,6 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
         });
 
         this.producer = this.kafka.producer();
-<<<<<<< HEAD
         try {
             await this.producer.connect();
             this.logger.log('Kafka producer connected successfully');
@@ -58,20 +44,10 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
             this.logger.log('Kafka connections closed');
         } catch (err) {
             this.logger.error('Error during Kafka shutdown', (err as Error).stack);
-=======
-        await this.producer.connect();
-    }
-
-    async onModuleDestroy() {
-        await this.producer.disconnect();
-        if (this.consumer) {
-            await this.consumer.disconnect();
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
         }
     }
 
     getProducer(): Producer {
-<<<<<<< HEAD
         if (!this.producer) throw new Error('Kafka producer not initialized');
         return this.producer;
     }
@@ -98,13 +74,4 @@ export class KafkaService implements OnModuleInit, OnModuleDestroy {
             throw err;
         }
     }
-=======
-        return this.producer;
-    }
-
-    createConsumer(groupId: string): Consumer {
-        this.consumer = this.kafka.consumer({ groupId });
-        return this.consumer;
-    }
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 }

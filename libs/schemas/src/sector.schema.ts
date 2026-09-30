@@ -4,13 +4,13 @@ import { Document, Types } from 'mongoose';
 @Schema()
 export class Sector extends Document {
     @Prop({ type: Types.ObjectId, ref: 'Domain' })
-    domain_id: Types.ObjectId;
+    domain_id!: Types.ObjectId;
 
     @Prop({ type: Types.ObjectId, ref: 'User' })
-    creator_id: Types.ObjectId;
+    creator_id!: Types.ObjectId;
 
     @Prop({ required: true })
-    title: string;
+    title!: string;
 
     @Prop()
     status?: string;
@@ -30,10 +30,10 @@ export class Sector extends Document {
             }
         ], default: []
     })
-    members: { user_id: Types.ObjectId; role: string; public_key: string }[]
+    members!: { user_id: Types.ObjectId; role: string; public_key: string }[]
 
     @Prop({ type: [Object], default: [] })
-    data: any[];
+    data!: any[];
 }
 
 export const SectorSchema = SchemaFactory.createForClass(Sector);

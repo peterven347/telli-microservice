@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { Inject, Injectable, NestMiddleware } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { NextFunction } from 'express';
@@ -22,17 +21,6 @@ export class AuthService implements NestMiddleware {
 		@Inject("REDIS_CLIENT") private readonly redis: Redis,
 
 	) { }
-=======
-import { Injectable, NestMiddleware } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { NextFunction } from 'express';
-
-const revoked_access_tokens: string[] = []; //will take up memory over time
-
-@Injectable()
-export class AuthService implements NestMiddleware {
-	constructor(private jwtService: JwtService) { }
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	sign(user: any) {
 		return this.jwtService.sign({
 			sub: user._id,
@@ -65,7 +53,6 @@ export class AuthService implements NestMiddleware {
 			req.auth = { message: "Authentication error!" }
 		}
 	}
-<<<<<<< HEAD
 
 	async refreshAccessToken(body: any) {
 		try {
@@ -83,6 +70,4 @@ export class AuthService implements NestMiddleware {
 			}
 		}
 	};
-=======
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 }

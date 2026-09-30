@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-<<<<<<< HEAD
 import { Comment, Post, Like } from './post.schema';
 import { InjectModel } from '@nestjs/mongoose';
 import { ObjectId, Model, Types } from 'mongoose';
@@ -7,17 +6,10 @@ import { post } from 'axios';
 import { v2 as cloudinary } from "cloudinary"
 import { ConfigService } from '@nestjs/config';
 import { timestamp } from 'rxjs';
-=======
-import { PostDto } from '@app/dtos/auth.dto';
-import { Post } from '@app/schemas/post.schema';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 
 
 @Injectable()
 export class PostService {
-<<<<<<< HEAD
 	constructor(
 		private readonly configService: ConfigService,
 		@InjectModel(Post.name) private postModel: Model<Post>,
@@ -156,42 +148,10 @@ export class PostService {
 					cloudName: payload.numImages > 0 ? this.configService.get<string>("CLOUDINARY_CLOUD_NAME") : null
 				}
 			}
-=======
-	constructor(@InjectModel(Post.name) private postModel: Model<Post>) { }
-
-	async getPosts(cursor?: string) {
-		const query = cursor && Types.ObjectId.isValid(cursor) ? { _id: { $lt: cursor } } : {}
-		const posts: any = await this.postModel
-			.find(query)
-			.sort({ _id: -1 })
-			.limit(10).populate({path: "creator", select: "first_name logo"})
-
-		const nextPageCursor = posts.length > 0 ? posts[posts.length - 1]._id.toString() : null;
-		return { posts, nextPageCursor };
-	}
-
-	async createPost(payload: any) {
-		try {
-			const post = await this.postModel.create(
-				payload.file && payload.file.length >= 1 ?
-					{
-						text: payload.text,
-						pictureFile: payload.file.map(i => i.filename),
-						creator_id: "689b313009da3e3f85c3408c"
-					}
-					:
-					{
-						text: payload.text,
-						creator_id: "689b313009da3e3f85c3408c"
-					}
-			)
-			return post
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 		} catch (err) {
 			console.log(err)
 		}
 	};
-<<<<<<< HEAD
 
 	async createComment(payload: any) {
 		let doc;
@@ -296,6 +256,4 @@ export class PostService {
 		await this.postModel.deleteOne({ _id: payload.postId })
 		return { success: true }
 	};
-=======
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 }

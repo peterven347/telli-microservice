@@ -11,20 +11,13 @@ export class ChatController {
         return this.chatService.getDomain(userId)
     }
 
-<<<<<<< HEAD
     @MessagePattern({ cmd: "get_sector_domain" })
     async handleGetSectorDomain(domainId: string, userId: string) {
         return this.chatService.getSectorDomain(domainId, userId)
-=======
-    @MessagePattern({ cmd: "get_domain_by_sector" })
-    async handleGetDomainBySector(sectorId: string, userId: string) {
-        return this.chatService.getDomainBySector(sectorId, userId)
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
     }
 
     @MessagePattern({ cmd: "find_sector_to_join" })
     async handleFindSector(sectorTitle: string, userId: string) {
-<<<<<<< HEAD
         return this.chatService.findSectors(sectorTitle, userId)
     }
 
@@ -41,14 +34,6 @@ export class ChatController {
     @MessagePattern({cmd: "exit_domain"})
     async handleExitDomain(payload){
         return this.chatService.exitDomain(payload)
-=======
-        return this.chatService.findSector(sectorTitle, userId)
-    }
-
-    @MessagePattern({ cmd: "create_domain" })
-    async handleCreateDomain(payload: any, userId: string) {
-        return this.chatService.createDomain(payload, userId)
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
     }
 
     @MessagePattern({ cmd: "create_sector" })
@@ -56,15 +41,9 @@ export class ChatController {
         return this.chatService.createSector(payload)
     }
 
-<<<<<<< HEAD
     @MessagePattern({ cmd: "edit_domain_img" })
     async handleEditDomainImg(domainId: string, q: string, body: any) {
         return this.chatService.editDomainImg(domainId, q, body)
-=======
-    @MessagePattern({ cmd: "change_domain_holder" })
-    async handleChangeDomainHolder(domainId: string, q: string, body: any) {
-        return this.chatService.changeDomainHolder(domainId, q, body)
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
     }
 
     @MessagePattern({ cmd: "change_sector_name" })

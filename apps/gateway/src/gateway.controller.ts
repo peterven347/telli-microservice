@@ -1,14 +1,9 @@
-<<<<<<< HEAD
 import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Post, Put, Req, Res, Inject, Query, Patch, StreamableFile, UploadedFile, UseInterceptors, UploadedFiles, SetMetadata, Request, Delete, } from '@nestjs/common';
-=======
-import { Body, Controller, Get, Param, Post, Inject, Query, Patch, StreamableFile, UploadedFile, UseInterceptors, UploadedFiles, SetMetadata, Request, Req, } from '@nestjs/common';
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 import { AnyFilesInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ClientProxy } from '@nestjs/microservices';
 import { extname } from 'path';
 import { diskStorage } from 'multer';
 import { File as MulterFile } from 'multer';
-<<<<<<< HEAD
 import { createReadStream, existsSync, mkdirSync, statSync } from 'fs';
 import { join } from 'path';
 import { lookup } from 'mime-types';
@@ -52,24 +47,10 @@ const sectorImg = diskStorage({
 	filename: (req, file, cb) => {
 		const ext = `${extname(file.originalname)}`;
 		// cb(null, req.user.id)
-=======
-import { createReadStream } from 'fs';
-import { join } from 'path';
-import { lookup } from 'mime-types';
-import { EmailDto, LoginDto, PhoneNumbersDto, SignUpDto, PostDto } from '@app/dtos/auth.dto';
-import { KafkaProducer } from 'apps/kafka/kafka.producer';
-import { Public } from './auth/jwt-auth.guard';
-
-const domainImg = diskStorage({
-	destination: './uploads/domainImg',
-	filename: (req, file, cb) => {
-		const ext = `${extname(file.originalname)}`;
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 		cb(null, Date.now().toString() + '-' + Math.round(Math.random() * 1e9) + ext)
 	},
 });
 
-<<<<<<< HEAD
 
 const uploadPath = join(process.cwd(), 'uploads', 'chat');
 if (!existsSync(uploadPath)) {
@@ -77,10 +58,6 @@ if (!existsSync(uploadPath)) {
 }
 const chat = diskStorage({
 	destination: uploadPath,
-=======
-const chat = diskStorage({
-	destination: './uploads/chat',
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	filename: (req, file, cb) => {
 		const fileExtension = `${extname(file.originalname)}`;
 		cb(null, file.originalname)
@@ -88,13 +65,8 @@ const chat = diskStorage({
 	},
 });
 
-<<<<<<< HEAD
 const post = diskStorage({
 	destination: '../../../uploads/post',
-=======
-const storage3 = diskStorage({
-	destination: './uploads/post',
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	filename: (req, file, cb) => {
 		const fileExtension = `${extname(file.originalname)}`;
 		cb(null, Date.now().toString() + '-' + file.originalname)
@@ -142,7 +114,6 @@ const chatFileFilter = (req, file, cb) => {
 		cb(null, true)
 	}
 	else {
-<<<<<<< HEAD
 		cb(false)
 	}
 }
@@ -186,12 +157,6 @@ const getImage = async (imgName: string, folder: string): Promise<StreamableFile
 // 	}
 // }
 
-=======
-		cb(null, false)
-	}
-}
-
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 @Controller('chat')
 export class ChatController {
 	constructor(
@@ -199,7 +164,6 @@ export class ChatController {
 		private readonly kafkaProducer: KafkaProducer
 	) { }
 
-<<<<<<< HEAD
 	@Public()
 	@Get("test")
 	async test(@Request() req) {
@@ -216,35 +180,6 @@ export class ChatController {
 	@Get('chat/:file')
 	async getChatImage(@Param('file') fileName: string) {
 		return await getImage(fileName, "chat")
-=======
-	// @Public()
-	@Get("test")
-	async test(@Request() req) {
-		return req.user
-	}
-
-
-	@Get('domain_img/:file')
-	async getDomainImage(@Param('file') imgName: string): Promise<StreamableFile> {
-		const filePath = join(process.cwd(), 'uploads/domainImg', imgName);
-		const file = createReadStream(filePath);
-
-		return new StreamableFile(file, {
-			type: lookup(filePath) || 'application/octet-stream',
-			disposition: 'inline'
-		});
-	}
-
-	@Get('chat_img/:file')
-	async getChatImage(@Param('file') imgName: string): Promise<StreamableFile> {
-		const filePath = join(process.cwd(), 'uploads/chat', imgName);
-		const file = createReadStream(filePath);
-
-		return new StreamableFile(file, {
-			type: lookup(filePath) || 'application/octet-stream',
-			disposition: 'inline'
-		});
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	}
 
 	@Get("domain")
@@ -252,17 +187,10 @@ export class ChatController {
 		return this.chatClient.send({ cmd: "get_domain" }, {})
 	};
 
-<<<<<<< HEAD
 	@Get("domain/:domain_id")
 	async getSectorDomain(@Param("domain_id") domainId: string, @Request() req: any) {
 		const userId = req.user.id
 		return this.chatClient.send({ cmd: "get_sector_domain" }, { domainId, userId })
-=======
-	@Get("domain/:sector_id")
-	async getDomainBySector(@Param("sector_id") sectorId: string, @Request() req: any) {
-		const userId = req.user.id
-		return this.chatClient.send({ cmd: "get_domain_by_sector" }, { sectorId, userId })
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	};
 
 	@Get("message/:sector_id/:skip")
@@ -270,7 +198,6 @@ export class ChatController {
 		return this.chatClient.send({ cmd: "get_missed_messages" }, { sectorId, skip })
 	};
 
-<<<<<<< HEAD
 	@Get("sectors")
 	async searchSectorsByTitle(@Query("q") sectorTitle?: string) {
 		return this.chatClient.send({ cmd: "find_sector_to_join" }, sectorTitle)
@@ -315,32 +242,11 @@ export class ChatController {
 			userName: req.user.userName
 		};
 		return this.chatClient.send({ cmd: "create_domain" }, payload)
-=======
-	@Get("sector")
-	async searchSectorByTitle(@Query("q") sectorTitle: string) {
-		return this.chatClient.send({ cmd: "find_sector_to_join" }, sectorTitle)
-	};
-
-	@Post("domain")
-	@UseInterceptors(FileInterceptor('file', {
-		fileFilter,
-		storage: domainImg,
-		// limits: { fileSize: 10 * 1024 * 1024 }, //10MB
-	}))
-	async createNewDomain(@UploadedFile() file: MulterFile, @Body() body: any, @Request() req: any) {
-		const payload = {
-			...body,
-			file: file ?? null,
-		};
-		const userId = req.user.id
-		return this.chatClient.send({ cmd: "create_domain" }, { payload, userId })
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	};
 
 	@Post("sector/:domain_id")
 	@UseInterceptors(FileInterceptor('file', {
 		fileFilter,
-<<<<<<< HEAD
 		storage: sectorImg,
 		// limits: { fileSize: 10 * 1024 * 1024 }, //10MB
 	}))
@@ -350,16 +256,6 @@ export class ChatController {
 			...body,
 			userId: req.user.id,
 			userName: req.user.userName
-=======
-		storage: domainImg,
-		// limits: { fileSize: 10 * 1024 * 1024 }, //10MB
-	}))
-	async createNewSector(@UploadedFile() file: MulterFile, @Param("domain_id") domainId: string, @Body() body: any) {
-		const payload = {
-			domainId: domainId,
-			...body,
-			file: file ?? null,
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 		};
 		return this.chatClient.send({ cmd: "create_sector" }, payload)
 	};
@@ -370,7 +266,6 @@ export class ChatController {
 		storage: chat,
 	}))
 	async uploadFileinChat(@UploadedFile() file: MulterFile) {
-<<<<<<< HEAD
 		if (!file) {
 			return { success: false, message: 'No file received or file was rejected by filter' };
 		}
@@ -380,14 +275,6 @@ export class ChatController {
 	@Patch("/domain/:domain_id")
 	async changeDomainHolder(@Param("domain_id") domainId: string, @Query("q") q: string, @Body() body: any) {
 		return this.chatClient.send({ cmd: "edit_domain" }, { domainId, q, body })
-=======
-		return { success: true }
-	};
-
-	@Patch("/domain/:domain_id/q")
-	async changeDomainHolder(@Param("domain_id") domainId: string, @Query("q") q: string, @Body() body: any) {
-		return this.chatClient.send({ cmd: "change_domain_holder" }, { domainId, q, body })
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	};
 
 	@Patch("/sector/:sector_id/:domain_id")
@@ -396,7 +283,6 @@ export class ChatController {
 	};
 }
 
-<<<<<<< HEAD
 @Controller('livestream')
 export class LivestreamController {
 	constructor(
@@ -449,13 +335,10 @@ export class LivestreamController {
 
 }
 
-=======
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 @Controller('post')
 export class PostController {
 	constructor(@Inject('POST_SERVICE') private readonly postClient: ClientProxy) { }
 
-<<<<<<< HEAD
 	@Get('sector_img/:file')
 	async getDomainImage(@Param('file') imgName: string) {
 		return await getImage(imgName, "sectorImg")
@@ -520,41 +403,18 @@ export class PostController {
 	async deletePost(@Param("post_id") postId: string, @Request() req: any) {
 		return this.postClient.send({ cmd: "delete_post" }, { postId, userId: req.user.id })
 	}
-=======
-	@Get("post")
-	async getPosts(@Query('cursor') cursor?: string) {
-		return this.postClient.send({ cmd: 'get_posts' }, { cursor })
-	}
-
-	@Post("post")
-	@UseInterceptors(FilesInterceptor("files", 4, {
-		fileFilter,
-		storage: storage3,
-	}))
-	async createPost(@UploadedFiles() files: MulterFile[], @Body() body: PostDto) {
-		console.log(body.text)
-		const payload = {
-			...body,
-			file: files.length >= 1 ? files : null,
-		};
-		return this.postClient.send({ cmd: "create_post" }, payload)
-	};
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 }
 
 @Controller('user')
 export class UserController {
 	constructor(@Inject('USER_SERVICE') private readonly userClient: ClientProxy) { }
 
-<<<<<<< HEAD
 	@Public() //move to authservice
 	@Post("refresh-access-token")
 	async refreshAccessToken(@Body() body: any) {
 		return this.userClient.send({ cmd: "refresh-access-token" }, body)
 	}
 	@Public()
-=======
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	@Get("verify-email")
 	async verifyEmail(@Query("token") token: string) {
 		return this.userClient.send({ cmd: "verify_user_email" }, token)
@@ -565,14 +425,11 @@ export class UserController {
 		return this.userClient.send({ cmd: 'get_user_by_id' }, id);
 	}
 
-<<<<<<< HEAD
 	@Get('public-key/:id')
 	async getPublicKey(@Param('id') id: string) {
 		return this.userClient.send({ cmd: 'get_user_public_key' }, id);
 	}
 
-=======
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	@Public()
 	@Post("sign-up")
 	async signUp(@Body() body: SignUpDto) {
@@ -585,14 +442,6 @@ export class UserController {
 		return this.userClient.send({ cmd: 'login' }, body);
 	}
 
-<<<<<<< HEAD
-=======
-	@Post("refresh-access-token")
-	async refreshAccessToken(@Body() body: any) {
-		return this.userClient.send({ cmd: "refresh_access_token" }, body)
-	}
-
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	@Post("verify-email")
 	async verifyEmaiiExists(@Body() body: EmailDto) {
 		return this.userClient.send({ cmd: "verify_this_email_exists" }, body);
@@ -601,12 +450,8 @@ export class UserController {
 	@Post("verify-numbers")
 	async verifyPhoneNumbers(@Request() req: any, @Body() body: PhoneNumbersDto) {
 		const userId = req.user.id
-<<<<<<< HEAD
 		const phoneNumbers = body.phoneNumbers
 		return this.userClient.send({ cmd: "verify_phone_numbers" }, { phoneNumbers, userId });
-=======
-		return this.userClient.send({ cmd: "verify_phone_numbers" }, { userId, body });
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
 	}
 
 	@Post("profile-img")
@@ -635,7 +480,6 @@ export class UserController {
 		const userId = req.user.id
 		return this.userClient.send({ cmd: "join_public_sector" }, { sectorId, userId })
 	}
-<<<<<<< HEAD
 }
 
 @Controller('files')
@@ -718,6 +562,3 @@ export class FilesController {
 		return this.filesService.generateSignature({ userId, id })
 	}
 }
-=======
-}
->>>>>>> 94a7fbfc780613842713ee0020540e3010689348
