@@ -12,7 +12,11 @@ export class MailService {
             service: 'gmail',
             auth: {
                 user: this.configService.get("EMAIL_USER"),
+<<<<<<< HEAD
+                pass: this.configService.get("EMAIL_PASS")
+=======
                 pass: "majw rcnp pgok meqd"
+>>>>>>> 94a7fbfc780613842713ee0020540e3010689348
             },
         });
     }

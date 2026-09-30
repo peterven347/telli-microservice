@@ -34,9 +34,18 @@
       "@app/schemas/*": [
         "libs/schemas/src/*"
       ],
+<<<<<<< HEAD
+      "@app/cassandra": [
+        "apps/cassandra/src"
+      ],
+      "@app/cassandra/*": [
+        "apps/cassandra/src/*"
+      ]
+=======
       // "@shared/schemas": [
       //   "libs/shared/schemas/src"
       // ]
+>>>>>>> 94a7fbfc780613842713ee0020540e3010689348
     }
   }
 }

@@ -13,7 +13,11 @@ export class CassandraService implements OnModuleInit {
     private async connect() {
         try {
             this.client = new Client({
+<<<<<<< HEAD
+                contactPoints: [process.env.CASSANDRA_HOST as string],
+=======
                 contactPoints: ['127.0.0.1'],
+>>>>>>> 94a7fbfc780613842713ee0020540e3010689348
                 localDataCenter: 'datacenter1',
                 authProvider: undefined,
             });

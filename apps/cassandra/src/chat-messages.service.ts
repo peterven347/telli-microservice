@@ -5,7 +5,11 @@ import { CassandraService } from './cassandra.service';
 export interface ChatMessage {
     id: string,
     _id: string,
+<<<<<<< HEAD
+    // domain_id: string,
+=======
     domain_id: string,
+>>>>>>> 94a7fbfc780613842713ee0020540e3010689348
     sector_id: string,
     creator_id: string,
     createdAt: types.TimeUuid,
@@ -21,10 +25,15 @@ export class ChatMessagesService implements OnModuleInit {
         const schema = `
             id text,
             sector_id text,
+<<<<<<< HEAD
+            creator_id text,
+            created_at timestamp,
+=======
             created_at timestamp,
             mdg_id text,
             domain_id text,
             creator_id text,
+>>>>>>> 94a7fbfc780613842713ee0020540e3010689348
             note text,
             type text,
             uri text,
@@ -34,7 +43,16 @@ export class ChatMessagesService implements OnModuleInit {
     }
 
     async saveMessage(message: ChatMessage) {
+<<<<<<< HEAD
+        try {
+            return this.cassandraService.insert('chat_messages', message);
+        } catch(err){
+            console.log(message)
+            console.log(err)
+        }
+=======
         return this.cassandraService.insert('chat_messages', message);
+>>>>>>> 94a7fbfc780613842713ee0020540e3010689348
     }
 
     async getMessagesByConversation(conversationId: string, limit = 50) {
