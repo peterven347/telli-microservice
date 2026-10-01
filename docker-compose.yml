@@ -5,8 +5,8 @@ services:
       build:
          context: .
          dockerfile: apps/gateway/Dockerfile
-      # ports:
-      #    - "3000:3000"
+      ports:
+         - "3000:3000"
       # environment:
          # KAFKA_BROKER: kafka:9092
          # MONGODB_URI: mongodb://mongo:27017/app
