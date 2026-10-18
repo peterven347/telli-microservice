@@ -40,8 +40,6 @@ export interface CompleteUploadDto {
 	fileHash: string;
 }
 
-
-
 const sectorImg = diskStorage({
 	destination: '../../../uploads/sectorImg',
 	filename: (req, file, cb) => {
@@ -59,27 +57,19 @@ if (!existsSync(uploadPath)) {
 const chat = diskStorage({
 	destination: uploadPath,
 	filename: (req, file, cb) => {
-		const fileExtension = `${extname(file.originalname)}`;
-		cb(null, file.originalname)
-		// cb(null, Date.now().toString() + '-' + file.originalname)
+		const fileExtension = file.mimetype.split("/")[1];
+		cb(null, `${Date.now().toString()}.${fileExtension}`)
+		// cb(null, `${file.originalname}.${fileExtension}`)
 	},
 });
 
-const post = diskStorage({
-	destination: '../../../uploads/post',
-	filename: (req, file, cb) => {
-		const fileExtension = `${extname(file.originalname)}`;
-		cb(null, Date.now().toString() + '-' + file.originalname)
-	},
-});
-
-const fileFilter = (req, file, cb) => {
-	if (file.mimetype === "image/jpg" || file.mimetype === "image/jpeg" || file.mimetype === "image/png") {
-		cb(null, true)
-	} else {
-		cb(null, false)
-	}
-};
+// const fileFilter = (req, file, cb) => {
+// 	if (file.mimetype === "image/jpg" || file.mimetype === "image/jpeg" || file.mimetype === "image/png") {
+// 		cb(null, true)
+// 	} else {
+// 		cb(null, false)
+// 	}
+// };
 
 const chatFileFilter = (req, file, cb) => {
 	if (
@@ -161,7 +151,7 @@ const getImage = async (imgName: string, folder: string): Promise<StreamableFile
 export class ChatController {
 	constructor(
 		@Inject('CHAT_SERVICE') private readonly chatClient: ClientProxy,
-		private readonly kafkaProducer: KafkaProducer
+		// private readonly kafkaProducer: KafkaProducer
 	) { }
 
 	@Public()
@@ -171,20 +161,15 @@ export class ChatController {
 	}
 
 	@Public()
-	@Get('sector_img/:file')
-	async getDomainImage(@Param('file') imgName: string) {
-		return await getImage(imgName, "sectorImg")
-	}
-
-	@Public()
 	@Get('chat/:file')
 	async getChatImage(@Param('file') fileName: string) {
 		return await getImage(fileName, "chat")
 	}
 
 	@Get("domain")
-	async getDomain() {
-		return this.chatClient.send({ cmd: "get_domain" }, {})
+	async getDomain(@Request() req: any) {
+		const userId = req.user.id
+		return this.chatClient.send({ cmd: "get_domain" }, userId)
 	};
 
 	@Get("domain/:domain_id")
@@ -218,22 +203,22 @@ export class ChatController {
 
 
 	@Patch("domain/:domain_id/logo")
-	@UseInterceptors(FileInterceptor('file', {
-		fileFilter,
-		storage: sectorImg,
-		// limits: { fileSize: 10 * 1024 * 1024 }, //10MB
-	}))
+	// @UseInterceptors(FileInterceptor('file', {
+	// 	fileFilter,
+	// 	storage: sectorImg,
+	// 	// limits: { fileSize: 10 * 1024 * 1024 }, //10MB
+	// }))
 	async editDomainImg(@Param("domain_id") domainId: string, @Request() req: any) {
 		const userId = req.user.id
 		return this.chatClient.send({ cmd: "edit_domain_img" }, { domainId, userId })
 	}
 
 	@Post("domain")
-	@UseInterceptors(FileInterceptor('file', {
-		fileFilter,
-		storage: sectorImg,
-		// limits: { fileSize: 10 * 1024 * 1024 }, //10MB
-	}))
+	// @UseInterceptors(FileInterceptor('file', {
+	// 	fileFilter,
+	// 	storage: sectorImg,
+	// 	// limits: { fileSize: 10 * 1024 * 1024 }, //10MB
+	// }))
 	async createNewDomain(@UploadedFile() file: MulterFile, @Body() body: any, @Request() req: any) {
 		console.log(req.user, "gateway controller")
 		const payload = {
@@ -245,11 +230,11 @@ export class ChatController {
 	};
 
 	@Post("sector/:domain_id")
-	@UseInterceptors(FileInterceptor('file', {
-		fileFilter,
-		storage: sectorImg,
-		// limits: { fileSize: 10 * 1024 * 1024 }, //10MB
-	}))
+	// @UseInterceptors(FileInterceptor('file', {
+	// 	fileFilter,
+	// 	storage: sectorImg,
+	// 	// limits: { fileSize: 10 * 1024 * 1024 }, //10MB
+	// }))
 	async createNewSector(@UploadedFile() file: MulterFile, @Param("domain_id") domainId: string, @Body() body: any, @Request() req: any) {
 		const payload = {
 			domainId: domainId,
@@ -265,7 +250,7 @@ export class ChatController {
 		fileFilter: chatFileFilter,
 		storage: chat,
 	}))
-	async uploadFileinChat(@UploadedFile() file: MulterFile) {
+	async uploadFileinChat(@UploadedFile() file: MulterFile, @Request() req: any,) {
 		if (!file) {
 			return { success: false, message: 'No file received or file was rejected by filter' };
 		}
@@ -281,6 +266,67 @@ export class ChatController {
 	async changeSectorName(@Param("sector_id") sectorId: string, @Param("domain_id") domainId: string, @Body() body: any) {
 		return this.chatClient.send({ cmd: "change_sector_name" }, { sectorId, domainId, body })
 	};
+}
+
+@Controller('post')
+export class PostController {
+	constructor(@Inject('POST_SERVICE') private readonly postClient: ClientProxy) { }
+
+	@Public()
+	@Get("posts")
+	async getPosts(@Request() req: any, @Query('cursor') cursor?: string) {
+		return this.postClient.send({ cmd: 'get_posts' }, { userId: req?.user?.id || "6a69ae1c6a5a6cfd507af311", cursor })
+	}
+
+	@Get("post/:user_id")
+	async getUserPosts(@Param("user_id") userId: string, @Query('cursor') cursor?: string) {
+		return this.postClient.send({ cmd: 'get_user_posts' }, { userId, cursor })
+	}
+
+	@Get("comment/:post_id")
+	async getComments(@Param("post_id") postId: string, @Query('cursor') cursor?: string) {
+		return this.postClient.send({ cmd: 'get_comments' }, { postId, cursor })
+	}
+
+	@Post("post")
+	async createPost(@Body() body: any, @Request() req: any) {
+		const payload = {
+			...req.user,
+			...body,
+		};
+		console.log(payload)
+		return this.postClient.send({ cmd: "create_post" }, payload)
+	};
+
+	@Post("post/:post_id")
+	// @UseInterceptors(FilesInterceptor("files", 4, {
+	// 	fileFilter,
+	// 	storage: post,
+	// }))
+	async createComment(@UploadedFiles() files: MulterFile[], @Body() body: PostDto, @Param("post_id") postId: string, @Request() req: any) {
+		const payload = {
+			...req.user,
+			...body,
+			postId: postId,
+			// file: files.length >= 1 ? files.slice(0, 4) : null,
+		};
+		return this.postClient.send({ cmd: "create_comment" }, payload)
+	};
+
+	@Post("post/:post_id/like")
+	async likePost(@Param("post_id") postId: string, @Request() req: any) {
+		return this.postClient.send({ cmd: "like_post" }, { postId, userId: req.user.id })
+	};
+
+	@Post("comment/:comment_id/like")
+	async likeComment(@Param("comment_id") commentId: string, @Request() req: any) {
+		return this.postClient.send({ cmd: "comment_post" }, { commentId, userId: req.user.id })
+	};
+
+	@Delete("post/:post_id/delete")
+	async deletePost(@Param("post_id") postId: string, @Request() req: any) {
+		return this.postClient.send({ cmd: "delete_post" }, { postId, userId: req.user.id })
+	}
 }
 
 @Controller('livestream')
@@ -333,76 +379,6 @@ export class LivestreamController {
 		return this.liveStreamClient.send({ cmd: "get_stream_comments" }, {})
 	}
 
-}
-
-@Controller('post')
-export class PostController {
-	constructor(@Inject('POST_SERVICE') private readonly postClient: ClientProxy) { }
-
-	@Get('sector_img/:file')
-	async getDomainImage(@Param('file') imgName: string) {
-		return await getImage(imgName, "sectorImg")
-	}
-
-	@Get('post_img/:file')
-	async getPostImage(@Param('file') imgName: string) {
-		return await getImage(imgName, "post")
-	}
-
-	@Get("posts")
-	async getPosts(@Request() req: any, @Query('cursor') cursor?: string) {
-		return this.postClient.send({ cmd: 'get_posts' }, { userId: req.user.id, cursor })
-	}
-
-	@Get("post/:user_id")
-	async getUserPosts(@Param("user_id") userId: string, @Query('cursor') cursor?: string) {
-		return this.postClient.send({ cmd: 'get_user_posts' }, { userId, cursor })
-	}
-
-	@Get("comment/:post_id")
-	async getComments(@Param("post_id") postId: string, @Query('cursor') cursor?: string) {
-		return this.postClient.send({ cmd: 'get_comments' }, { postId, cursor })
-	}
-
-	@Post("post")
-	async createPost(@Body() body: any, @Request() req: any) {
-		const payload = {
-			...req.user,
-			...body,
-		};
-		console.log(payload)
-		return this.postClient.send({ cmd: "create_post" }, payload)
-	};
-
-	@Post("post/:post_id")
-	// @UseInterceptors(FilesInterceptor("files", 4, {
-	// 	fileFilter,
-	// 	storage: post,
-	// }))
-	async createComment(@UploadedFiles() files: MulterFile[], @Body() body: PostDto, @Param("post_id") postId: string, @Request() req: any) {
-		const payload = {
-			...req.user,
-			...body,
-			postId: postId,
-			// file: files.length >= 1 ? files.slice(0, 4) : null,
-		};
-		return this.postClient.send({ cmd: "create_comment" }, payload)
-	};
-
-	@Post("post/:post_id/like")
-	async likePost(@Param("post_id") postId: string, @Request() req: any) {
-		return this.postClient.send({ cmd: "like_post" }, { postId, userId: req.user.id })
-	};
-
-	@Post("comment/:comment_id/like")
-	async likeComment(@Param("comment_id") commentId: string, @Request() req: any) {
-		return this.postClient.send({ cmd: "comment_post" }, { commentId, userId: req.user.id })
-	};
-
-	@Delete("post/:post_id/delete")
-	async deletePost(@Param("post_id") postId: string, @Request() req: any) {
-		return this.postClient.send({ cmd: "delete_post" }, { postId, userId: req.user.id })
-	}
 }
 
 @Controller('user')

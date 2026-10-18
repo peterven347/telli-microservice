@@ -35,7 +35,6 @@ export class ChatMessagesService implements OnModuleInit {
         try {
             return this.cassandraService.insert('chat_messages', message);
         } catch(err){
-            console.log(message)
             console.log(err)
         }
     }

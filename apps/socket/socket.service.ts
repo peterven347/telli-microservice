@@ -209,6 +209,7 @@ export class SocketService {
                             if (dataIndex === -1) return null;
                             try {
                                 const data = JSON.parse(fields[dataIndex + 1]);
+                                console.log(data, 999)
                                 if (!sectors.has(data._id)) return null;
                                 return { _redisId: id, ...data };
                             } catch {
@@ -219,8 +220,8 @@ export class SocketService {
                     if (!messagesByConversation[key]) messagesByConversation[key] = [];
                     messagesByConversation[key].push(...parsed);
                     if (messages.length > 0) {
-                        const lastMessageId = messages[messages.length - 1][0];
-                        // redis.set(`user:${userId}:last_read:${key}`, lastMessageId);
+                        // const lastMessageId = messages[messages.length - 1][0];
+                        // redis.set(`user:${socket.data.user._id}:last_read:${key}`, lastMessageId);
                     }
                 });
             } while (cursor !== "0");
@@ -230,7 +231,6 @@ export class SocketService {
         if (Object.keys(await missedSectorMessages()).length > 0) {
             socket.emit("missed-sector-messages", { messages: (await missedSectorMessages()) })
         }
-
     }
 
     async ackMessage({ streamKey, ids }: { streamKey: string, ids: string[] }) {

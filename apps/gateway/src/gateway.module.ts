@@ -21,7 +21,7 @@ import { FilesModule } from "../../fileUpload/files.module"
 			isGlobal: true,
 		}),
 		AuthModule,
-		KafkaModule,
+		// KafkaModule,
 		SocketModule,
 		FilesModule,
 		JwtModule.register({ secret: process.env.ACCESS_TOKEN_SECRET, signOptions: { expiresIn: '1m' }, }),
@@ -45,17 +45,6 @@ import { FilesModule } from "../../fileUpload/files.module"
 				}),
 			},
 			{
-				name: 'LIVESTREAM_SERVICE',
-				inject: [ConfigService],
-				useFactory: (configService: ConfigService) => ({
-					transport: Transport.TCP,
-					options: {
-						host: configService.getOrThrow<string>('LIVESTREAM_SERVICE_HOST'),
-						port: configService.getOrThrow<number>('LIVESTREAM_SERVICE_TCP_PORT'),
-					},
-				}),
-			},
-			{
 				name: 'POST_SERVICE',
 				inject: [ConfigService],
 				useFactory: (configService: ConfigService) => ({
@@ -63,6 +52,17 @@ import { FilesModule } from "../../fileUpload/files.module"
 					options: {
 						host: configService.getOrThrow<string>('POST_SERVICE_HOST'),
 						port: configService.getOrThrow<number>('POST_SERVICE_TCP_PORT'),
+					},
+				}),
+			},
+			{
+				name: 'LIVESTREAM_SERVICE',
+				inject: [ConfigService],
+				useFactory: (configService: ConfigService) => ({
+					transport: Transport.TCP,
+					options: {
+						host: configService.getOrThrow<string>('LIVESTREAM_SERVICE_HOST'),
+						port: configService.getOrThrow<number>('LIVESTREAM_SERVICE_TCP_PORT'),
 					},
 				}),
 			},

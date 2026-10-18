@@ -6,10 +6,10 @@ cls
 start npm run start:dev --watch chat
 timeout /t 1 /nobreak
 cls
-start npm run start:dev --watch livestream
+start npm run start:dev --watch post
 timeout /t 1 /nobreak
 cls
-start npm run start:dev --watch post
+start npm run start:dev --watch livestream
 timeout /t 1 /nobreak
 cls
 start npm run start:dev --watch user

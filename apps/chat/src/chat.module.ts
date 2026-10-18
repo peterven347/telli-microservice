@@ -8,7 +8,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { SocketPublisherModule } from 'libs/socket-publisher/socket-publisher.module';
 
 import { RedisModule } from 'apps/redis/redis.module';
-// import { KafkaModule } from 'apps/kafka/kafka.module';
+import { KafkaModule } from 'apps/kafka/kafka.module';
 import { HttpModule } from '@nestjs/axios';
 
 @Module({

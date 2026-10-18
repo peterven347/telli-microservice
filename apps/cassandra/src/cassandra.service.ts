@@ -71,7 +71,7 @@ export class CassandraService implements OnModuleInit {
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         const params = [
-            dataObj._id,
+            types.TimeUuid.now().toString(),
             dataObj.sector_id,
             dataObj.createdAt,
             dataObj.id,

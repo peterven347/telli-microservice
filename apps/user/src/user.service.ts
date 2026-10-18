@@ -1,20 +1,17 @@
 import * as bcrypt from 'bcryptjs';
-import * as os from 'os';
 import { Injectable, NotFoundException, ConflictException, Body, Inject } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Model } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { SignOptions } from 'jsonwebtoken';
 import { InjectModel } from '@nestjs/mongoose';
 import { Redis } from 'ioredis';
-import { EmailDto, LoginDto, PhoneNumbersDto, SignUpDto } from '@app/dtos/dto';
+import { EmailDto, LoginDto, SignUpDto } from '@app/dtos/dto';
 import { lastValueFrom } from 'rxjs/internal/lastValueFrom';
 import { HttpService } from '@nestjs/axios';
 import { parsePhoneNumberFromString, CountryCode } from "libphonenumber-js";
 import { MailService } from './mail/mail.service';
 import { User } from "./user.schema";
-
-const url_domain = `http://localhost:3000`
-// const url_domain = `http://${getLocalIPAddress()}:3000`
 
 function generateToken(jwtService: JwtService, payload: any, options?: SignOptions): string {
 	return jwtService.sign(payload, options);
@@ -24,20 +21,6 @@ function verifyToken(jwtService: JwtService, payload: any, options?: SignOptions
 	return jwtService.verify(payload, options);
 };
 
-
-// function cleanPhoneNumber(input: string) {
-// 	const number = input.trim().replace(/\D/g, '');
-// 	for (const i of country_dial_codes) {
-// 		if (number.startsWith(i)) {
-// 			return number.replace(i, '');
-// 		}
-// 	}
-// 	if (number.startsWith("0")) {
-// 		return number.slice(1);
-// 	}
-// 	return number;
-// };
-
 function normalizePhoneNumber(input: string, default_country: CountryCode = "NG"): string | null {
 	const phone = parsePhoneNumberFromString(input, default_country);
 	if (!phone || !phone.isValid()) {
@@ -46,20 +29,11 @@ function normalizePhoneNumber(input: string, default_country: CountryCode = "NG"
 	return phone.number;
 }
 
-function getLocalIPAddress(): string {
-	const interfaces = os.networkInterfaces();
-	for (const name of Object.keys(interfaces)) {
-		const ifaceList = interfaces[name];
-		if (!ifaceList) continue;
-		for (const iface of ifaceList) {
-			if (iface.family === 'IPv4' && !iface.internal) {
-				return iface.address;
-			}
-		}
-	}
-
-	return '127.0.0.1';
-};
+const opts = {
+	key: "USERNAMES",
+	expectedItems: 100000,
+	falsePositiveRate: 0.01
+}
 
 @Injectable()
 export class UserService {
@@ -69,7 +43,34 @@ export class UserService {
 		private readonly httpService: HttpService,
 		private readonly mailService: MailService,
 		private jwtService: JwtService,
+		private configService: ConfigService,
+
 	) { }
+
+	async onModuleInit() {
+		try {
+			await this.redisClient.call(
+				'BF.RESERVE', opts.key,
+				String(opts.falsePositiveRate), String(opts.expectedItems),
+			);
+		} catch (e: any) {
+			if (!String(e.message).includes('item exists')) throw e;
+		}
+	};
+
+	async testadd(value: string) {
+		const rr = await this.redisClient.call('BF.ADD', opts.key, value)
+		console.log(rr)
+	}
+
+	async testexist(value: string) {
+		const result = await this.redisClient.call(
+			"BF.EXISTS",
+			opts.key,
+			value,
+		);
+		console.log(result);
+	}
 
 	async refreshAccessToken(body: any) {
 		try {
@@ -119,12 +120,31 @@ export class UserService {
 		return user;
 	};
 
+	async checkUserName(value: string) {
+		const userNameExists = await this.redisClient.exists(`TEMP_USERNAMES:${value}`) || await this.redisClient.call("BF.EXISTS", opts.key, value);
+		if (userNameExists) {
+			const dbCheck = this.userModel.findOne({ user_name: value })
+			if (!dbCheck) return ({ success: true, message: "" })
+			return ({ success: false, message: "user name already exists" })
+		} else {
+			return ({ success: true, message: "" })
+		}
+	};
+
 	async signUp(body: SignUpDto) {
 		const { email, user_name, password } = body
+		const url_domain = this.configService.get<string>("URL_DOMAIN")
 		try {
-			const existingUser = await this.redisClient.exists(`PENDING_EMAILS:${email}`) || await this.userModel.exists({ email });
-			if (existingUser) return ({ success: false, message: "email already exists" });
+			const existingMail = await this.redisClient.exists(`PENDING_EMAILS:${email}`) || await this.userModel.exists({ email });
+			if (existingMail) return ({ success: false, message: "email already exists" });
 			// if (existingUser) throw new ConflictException('email already exists');
+
+			const userNameExists = await this.redisClient.exists(`TEMP_USERNAMES:${user_name}`) || await this.redisClient.call("BF.EXISTS", opts.key, user_name);
+			if (userNameExists) {
+				return ({ success: false, message: "user name already exists" })
+			} else {
+				await this.redisClient.set(`TEMP_USERNAMES:${user_name}`, user_name, "EX", 600);
+			}
 
 			const hashedPassword = await bcrypt.hash(password, 10)
 			const newUser = new this.userModel({
@@ -160,6 +180,7 @@ export class UserService {
 			const user = userData ? JSON.parse(userData) : null;
 			if (user) {
 				const newUser = new this.userModel(user);
+				await this.redisClient.call('BF.ADD', opts.key, user.user_name)
 				await this.redisClient.del(`PENDING_EMAILS:${email}`)
 				await newUser.save();
 				return "Your email has been verified!, go back and login"
@@ -412,7 +433,7 @@ export class UserService {
 	};
 
 	async findByList(list: string[]) {
-		 const users = await this.userModel.find(
+		const users = await this.userModel.find(
 			{
 				$or: [{ email: { $in: list } }, { phone_number: { $in: list } }]
 			},

@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 @Schema()
 export class User extends Document {
@@ -37,7 +37,7 @@ export class User extends Document {
     @Prop([String])
     fcmTokens!: string[];
 
-    @Prop([{ type: Types.ObjectId, ref: 'Sector' }])
+    @Prop([{ type: MongooseSchema.Types.ObjectId, ref: 'Sector' }])
     sectors!: Types.ObjectId[];
 
     @Prop({ type: Date, default: Date.now })

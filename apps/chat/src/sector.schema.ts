@@ -1,12 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema} from 'mongoose';
 
 @Schema()
 export class Sector extends Document {
-    @Prop({ type: Types.ObjectId, ref: 'Domain' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Domain' })
     domain_id!: Types.ObjectId;
 
-    @Prop({ type: Types.ObjectId, ref: 'User' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     creator_id!: Types.ObjectId;
 
     @Prop({ required: true })
@@ -21,7 +21,7 @@ export class Sector extends Document {
     @Prop({
         type: [
             {
-                _id: { type: Types.ObjectId, ref: "User", required: true },
+                _id: { type: MongooseSchema.Types.ObjectId, ref: "User", required: true },
                 user_name: { type: String },
                 isAdmin: {type: Boolean, default: false}
                 // role: { type: String, enum: ["admin", "member"], default: "member" },

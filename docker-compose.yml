@@ -32,8 +32,10 @@ services:
    chat:
       env_file:
          - .env
-      ports:
-       - "3001:3001"
+      # ports:
+      #    - "3001:3001"
+      networks:
+         - internal
       build:
          context: .
          dockerfile: apps/chat/Dockerfile
@@ -49,8 +51,10 @@ services:
    post:
       env_file:
          - .env
-      ports:
-       - "3003:3003"
+      # ports:
+      #  - "3003:3003"
+      networks:
+         - internal
       build:
          context: .
          dockerfile: apps/post/Dockerfile
@@ -59,8 +63,10 @@ services:
    livestream:
       env_file:
          - .env
-      ports:
-       - "3002:3002"
+      # ports:
+      #  - "3002:3002"
+      networks:
+         - internal
       build:
          context: .
          dockerfile: apps/livestream/Dockerfile
@@ -69,8 +75,10 @@ services:
    user:
       env_file:
          - .env
-      ports:
-       - "3004:3004"
+      # ports:
+      #  - "3004:3004"
+      networks:
+         - internal
       build:
          context: .
          dockerfile: apps/user/Dockerfile
@@ -149,13 +157,12 @@ services:
    redis:
       env_file:
          - .env
-      image: redis:7-alpine
+      image: redis/redis-stack:latest
       ports:
          - "6379:6379"
       volumes:
          - redis_data:/data
       restart: always
-
 
    mediamtx:
       image: bluenviron/mediamtx:latest
@@ -168,5 +175,9 @@ services:
 volumes:
    kafka_data:
    redis_data:
-   # mongo_data:
    cassandra_data:
+
+networks:
+  public:
+  internal:
+      internal: true

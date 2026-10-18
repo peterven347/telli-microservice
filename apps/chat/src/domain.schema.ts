@@ -1,12 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 @Schema({ timestamps: true })
 export class Domain extends Document {
     @Prop({ required: true })
     name!: string;
 
-    @Prop({ type: Types.ObjectId, required: true, ref: 'User', index: true })
+    @Prop({ type: MongooseSchema.Types.ObjectId, required: true, ref: 'User', index: true })
     creator_id!: Types.ObjectId;
 
     @Prop({ default: '' })

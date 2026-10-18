@@ -84,7 +84,6 @@ export class PostService {
 	}
 
 	async getUserPosts(userId: string, cursor?: string) {
-		console.log("start")
 		const query = cursor && Types.ObjectId.isValid(cursor) ? { _id: { $lt: new Types.ObjectId(cursor) }, creator_id: new Types.ObjectId(userId) } : { creator_id: new Types.ObjectId(userId) }
 		const posts: any = await this.postModel
 			.find(query)
@@ -92,7 +91,6 @@ export class PostService {
 			.limit(10)
 
 		const nextPageCursor = posts.length > 0 ? posts[posts.length - 1]._id.toString() : null;
-		console.log(posts)
 		return { posts, nextPageCursor };
 	};
 

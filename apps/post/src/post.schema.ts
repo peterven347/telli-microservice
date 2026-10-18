@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument, Types } from 'mongoose';
+import { HydratedDocument, Types, Schema as MongooseSchema } from 'mongoose';
 
 export type PostDocument = HydratedDocument<Post>;
 export type commentDocument = HydratedDocument<Comment>;
@@ -13,7 +13,7 @@ export class Post {
 	@Prop({ type: [String], default: [] })
 	images!: string[];
 
-	@Prop({ type: Types.ObjectId, ref: 'User', required: true })
+	@Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
 	creator_id!: Types.ObjectId;
 
 	@Prop({ required: true })
@@ -34,13 +34,13 @@ export class Comment {
 	@Prop([String])
 	images!: string[];
 
-	@Prop({ type: Types.ObjectId, ref: 'User', required: true })
-	creator_id!: Types.ObjectId
+	@Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
+	creator_id!: Types.ObjectId;
 
 	@Prop({ required: true })
 	creator_name!: string;
 
-	@Prop({ type: Types.ObjectId, ref: "Post", required: true })
+	@Prop({ type: MongooseSchema.ObjectId, ref: "Post", required: true })
 	parent_post_id!: Types.ObjectId;
 
 	@Prop({default: 0})
@@ -52,10 +52,10 @@ export class Comment {
 
 @Schema({})
 export class Like {
-	@Prop({ type: Types.ObjectId, ref: 'User', required: true })
+	@Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
 	creator_id!: Types.ObjectId
 
-	@Prop({ type: Types.ObjectId, required: true })
+	@Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Post', required: true })
 	post_id!: Types.ObjectId;
 }
 

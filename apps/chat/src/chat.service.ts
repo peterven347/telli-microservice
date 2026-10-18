@@ -4,12 +4,13 @@ import { Injectable, Inject, Param, Query } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { InjectModel } from '@nestjs/mongoose';
 import { Redis } from 'ioredis';
-// import { KafkaProducer } from 'apps/kafka/kafka.producer';
+import { KafkaProducer } from 'apps/kafka/kafka.producer';
 import { Domain } from "./domain.schema"
 import { Sector } from './sector.schema';
 // import { SocketService } from 'apps/socket/socket.service';
 import { SocketPublisherService } from 'libs/socket-publisher/socket-publisher.service';
 import { parsePhoneNumberFromString, CountryCode } from "libphonenumber-js";
+import { ConfigService } from '@nestjs/config';
 
 
 function regexQuery(string: string) {
@@ -18,28 +19,30 @@ function regexQuery(string: string) {
 };
 
 // function cleanPhoneNumber(input: string) {
-//     const number = input.trim().replace(/\D/g, '');
-//     for (const i of country_dial_codes) {
-//         if (number.startsWith(i)) {
-//             return number.replace(i, '');
-//         }
-//     }
-//     if (number.startsWith("0")) {
-//         return number.slice(1);
-//     }
-//     return number;
-// };
-
-function normalizePhoneNumber(input: string, default_country: CountryCode = "NG"): string | null {
-    const phone = parsePhoneNumberFromString(input, default_country);
-    if (!phone || !phone.isValid()) {
-        return null;
-    }
-    return phone.number;
+    //     const number = input.trim().replace(/\D/g, '');
+    //     for (const i of country_dial_codes) {
+        //         if (number.startsWith(i)) {
+            //             return number.replace(i, '');
+            //         }
+            //     }
+            //     if (number.startsWith("0")) {
+                //         return number.slice(1);
+                //     }
+                //     return number;
+                // };
+                
+                function normalizePhoneNumber(input: string, default_country: CountryCode = "NG"): string | null {
+                    const phone = parsePhoneNumberFromString(input, default_country);
+                    if (!phone || !phone.isValid()) {
+                        return null;
+                    }
+                    return phone.number;
 };
 
 @Injectable()
 export class ChatService {
+    private readonly userServiceTcpPort: string;
+
     constructor(
         @InjectModel(Domain.name) private chatModel: Model<Domain>,
         @InjectModel(Sector.name) private sectorModel: Model<Sector>,
@@ -47,8 +50,11 @@ export class ChatService {
         // private readonly socketService: SocketService,
         private readonly httpService: HttpService,
         // private readonly kafkaProducer: KafkaProducer,
-        private readonly socketPublisher: SocketPublisherService
-    ) { }
+        private readonly socketPublisher: SocketPublisherService,
+        private readonly configService: ConfigService
+    ) {
+        this.userServiceTcpPort = this.configService.getOrThrow<string>('USER_SERVICE_TCP_PORT');
+    }
 
     // async emitNewDomainCreated(socketId: string, data: any) {
     //     this.socketService.emitToSocket(socketId, 'new-domain', data);
@@ -73,7 +79,7 @@ export class ChatService {
         const _delegates = delegates.split(",")
         const users = (
             await firstValueFrom(
-                this.httpService.post(`http://localhost:4004/find-by-list`,
+                this.httpService.post(`http://localhost:${this.userServiceTcpPort}/find-by-list`,
                     {
                         list: _delegates.map(i => this.isNumeric(i) ? normalizePhoneNumber(i) : i)
                     }
@@ -86,7 +92,7 @@ export class ChatService {
         try {
             const response = await lastValueFrom(
                 this.httpService.get(
-                    `http://localhost:4004/find-one`,
+                    `http://localhost:${this.userServiceTcpPort}/find-one`,
                     {
                         params: {
                             id: userId,
@@ -213,7 +219,7 @@ export class ChatService {
                 if (users?.length === 1) {
                     return { success: false, message: "add at least one valid delegate" }
                 }
-                await firstValueFrom(this.httpService.patch(`http://localhost:4004/update-many`,
+                await firstValueFrom(this.httpService.patch(`http://localhost:${this.userServiceTcpPort}/update-many`,
                     { users: users.map(i => i._id), sectorId: newSector._id }
                 ))
 
@@ -265,7 +271,7 @@ export class ChatService {
         const { domainId, userId } = payload
         try {
             const sectorIds = await this.sectorModel.find({ domain_id: domainId }).distinct('_id');
-            await firstValueFrom(this.httpService.patch(`http://localhost:4004/exit-domain`,
+            await firstValueFrom(this.httpService.patch(`http://localhost:${this.userServiceTcpPort}/exit-domain`,
                 { sectorIds, userId }
             ))
             await this.sectorModel.updateMany(
@@ -289,7 +295,7 @@ export class ChatService {
         try {
             const response = await firstValueFrom(
                 this.httpService.get(
-                    `http://localhost:4004/find-one/id/${userId}`,
+                    `http://localhost:${this.userServiceTcpPort}/find-one/id/${userId}`,
                     {
                         params: {
                             select: 'sectors',
@@ -349,7 +355,7 @@ export class ChatService {
                 if (users?.length === 1) {
                     return { success: false, message: "add at least one valid delegate" }
                 }
-                await firstValueFrom(this.httpService.patch(`http://localhost:4004/update-many`,
+                await firstValueFrom(this.httpService.patch(`http://localhost:${this.userServiceTcpPort}/update-many`,
                     { users: users.map(i => i._id), sectorId: newSector._id }
                 ))
                 for (const user of users.filter(j => j._id !== userId)) {
@@ -383,7 +389,7 @@ export class ChatService {
     async exitSector(payload) {
         const { sectorId, userId } = payload
         try {
-            await firstValueFrom(this.httpService.patch(`http://localhost:4004/exit-sector`,
+            await firstValueFrom(this.httpService.patch(`http://localhost:${this.userServiceTcpPort}/exit-sector`,
                 { sectorId, userId }
             ))
             await this.sectorModel.updateOne(

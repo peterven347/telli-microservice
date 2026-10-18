@@ -67,6 +67,11 @@ export class UserController {
 		return this.userService.joinPublicector(sectorId, userId)
 	}
 
+	@Get("username/:value")
+	async testexist(@Param("value") value: string) {
+		return this.userService.checkUserName(value)
+	}
+
 	@Get('find-one/id/:user_id')
 	async findById(@Param("user_id") userId: string) {
 		return this.userService.findOneById(userId);
@@ -101,5 +106,4 @@ export class UserController {
 		const { users, sectorId } = body
 		return this.userService.updateMany(users, sectorId);
 	}
-
 }
