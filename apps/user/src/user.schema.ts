@@ -3,18 +3,19 @@ import { Document, Types, Schema as MongooseSchema } from 'mongoose';
 
 @Schema()
 export class User extends Document {
-    @Prop({ required: true })
+    @Prop({ required: true, lowercase: true, trim: true })
     user_name!: string;
 
     // @Prop({ required: true })
     // last_name: string;
 
-    @Prop()
+    @Prop({ trim: true })
     bio!: string;
 
     @Prop({
         required: true,
         lowercase: true,
+        trim: true,
         match: [/.+@.+\..+/, 'Please provide a valid email address'],
     })
     email!: string;
@@ -45,3 +46,7 @@ export class User extends Document {
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
+UserSchema.index(
+    { user_name: 1 },
+    { unique: true, collation: { locale: 'en', strength: 2 } },
+);

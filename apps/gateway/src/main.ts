@@ -26,6 +26,7 @@ async function bootstrap() {
 	}
 
 	await app.listen(3000, "0.0.0.0");
+	app.setGlobalPrefix('api', { exclude: ['.well-known/assetlinks.json'] });
 	//await app.listen(3000);
 	console.log('Gateway HTTP server listening on port 3000');
 }

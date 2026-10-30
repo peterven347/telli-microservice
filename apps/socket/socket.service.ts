@@ -126,6 +126,7 @@ export class SocketService {
 
     async sectorMessage(data: any, socket: Socket) {
         const senderId = socket.data.user._id
+        console.log(socket.data.user)
         const userData = await this.redis.hget('connected_users', senderId);
         const connectedUser = userData && JSON.parse(userData);
         const sectors = connectedUser?.sectors;

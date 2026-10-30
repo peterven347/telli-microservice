@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, ParseIntPipe, Post, Put, Req, Res, Inject, Query, Patch, StreamableFile, UploadedFile, UseInterceptors, UploadedFiles, SetMetadata, Request, Delete, } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Header, Param, ParseIntPipe, Post, Put, Req, Res, Inject, Query, Patch, StreamableFile, UploadedFile, UseInterceptors, UploadedFiles, SetMetadata, Request, Delete, } from '@nestjs/common';
 import { AnyFilesInterceptor, FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { ClientProxy } from '@nestjs/microservices';
 import { extname } from 'path';
@@ -272,10 +272,14 @@ export class ChatController {
 export class PostController {
 	constructor(@Inject('POST_SERVICE') private readonly postClient: ClientProxy) { }
 
-	@Public()
 	@Get("posts")
 	async getPosts(@Request() req: any, @Query('cursor') cursor?: string) {
-		return this.postClient.send({ cmd: 'get_posts' }, { userId: req?.user?.id || "6a69ae1c6a5a6cfd507af311", cursor })
+		return this.postClient.send({ cmd: 'get_posts' }, { userId: req.user.id, cursor }) //"6a69ae1c6a5a6cfd507af311"
+	}
+
+	@Get("posts/search")
+	async getSearchPosts(@Request() req: any, @Query('text') text: string, @Query('cursor') cursor?: string) {
+		return this.postClient.send({ cmd: "get_search_posts" }, { userId: req.user.id, text, cursor }) //"6a69ae1c6a5a6cfd507af311"
 	}
 
 	@Get("post/:user_id")
@@ -390,6 +394,7 @@ export class UserController {
 	async refreshAccessToken(@Body() body: any) {
 		return this.userClient.send({ cmd: "refresh-access-token" }, body)
 	}
+
 	@Public()
 	@Get("verify-email")
 	async verifyEmail(@Query("token") token: string) {
@@ -404,6 +409,12 @@ export class UserController {
 	@Get('public-key/:id')
 	async getPublicKey(@Param('id') id: string) {
 		return this.userClient.send({ cmd: 'get_user_public_key' }, id);
+	}
+
+	@Get('search')
+	async searchUsers(@Request() req: any, @Query('text') text?: string) {
+		const userId = req.user.id
+		return this.userClient.send({ cmd: "get_users" }, { userId, text });
 	}
 
 	@Public()
@@ -536,5 +547,28 @@ export class FilesController {
 	async getUploadSigntaure(@Param("id") id: string, @Request() req: any) {
 		const userId = req.user.id
 		return this.filesService.generateSignature({ userId, id })
+	}
+}
+
+@Controller('.well-known')
+export class AssetLinksController {
+	@Get('assetlinks.json')
+	@Header('Content-Type', 'application/json')
+	@Header('Cache-Control', 'public, max-age=3600')
+	getAssetLinks() {
+		return [
+			{
+				relation: ['delegate_permission/common.handle_all_urls'],
+				target: {
+					namespace: 'android_app',
+					package_name: 'com.yourapp.package',
+					sha256_cert_fingerprints: [
+						'DEBUG_FINGERPRINT_HERE',
+						'RELEASE_FINGERPRINT_HERE',
+					],
+					// sha256_cert_fingerprints: process.env.ANDROID_CERT_FINGERPRINTS?.split(',') ?? [],
+				},
+			},
+		];
 	}
 }

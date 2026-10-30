@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { MessagePattern, Payload } from '@nestjs/microservices';
+import { Body, Controller, Get, Param, Patch, Post, } from '@nestjs/common';
+import { MessagePattern } from '@nestjs/microservices';
 import { UserService } from './user.service';
-import { EmailDto, LoginDto, PhoneNumbersDto, SignUpDto } from "@app/dtos/dto"
+import { EmailDto, LoginDto, SignUpDto } from "@app/dtos/dto"
 
 @Controller()
 export class UserController {
@@ -30,6 +30,11 @@ export class UserController {
 	@MessagePattern({ cmd: 'get_user_by_id' })
 	async handleGetUserById(id: string) {
 		return this.userService.getUserById(id);
+	}
+
+	@MessagePattern({ cmd: 'get_users' })
+	async handleGetUsers(payload) {
+		return this.userService.searchUsers(payload);
 	}
 
 	@MessagePattern({ cmd: 'get_user_public_key' })

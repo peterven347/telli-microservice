@@ -7,9 +7,6 @@ services:
          dockerfile: apps/gateway/Dockerfile
       ports:
          - "3000:3000"
-      # environment:
-         # KAFKA_BROKER: kafka:9092
-         # MONGODB_URI: mongodb://mongo:27017/app
       depends_on:
          kafka:
             condition: service_started
@@ -140,19 +137,6 @@ services:
          interval: 10s
          timeout: 5s
          retries: 6
-
-   # mongo:
-   #    image: mongo
-   #    ports:
-   #       - "27017:27017"
-   #    volumes:
-   #       - mongo_data:/data/db
-   #    healthcheck:
-   #       test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
-   #       interval: 10s
-   #       timeout: 5s
-   #       retries: 5
-      # restart: always
 
    redis:
       env_file:

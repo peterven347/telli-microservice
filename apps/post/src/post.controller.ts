@@ -9,9 +9,17 @@ export class PostController {
 	constructor(private readonly postService: PostService) { }
 
 	@MessagePattern({ cmd: "get_posts" })
-	async handleGetPosts(payload: { cursor?: string, userId: string }) {
+	async handleGetPosts(payload: { userId: string, cursor?: string, }) {
 		const { cursor = "", userId } = payload;
-		return this.postService.getPosts(userId, cursor );
+		return this.postService.getPosts(userId, cursor);
+	}
+
+	@MessagePattern({ cmd: "get_search_posts" })
+	async handleGetSearchPosts(payload: {userId: string, text: string, cursor?: string, }) {
+		const {userId, text, cursor } = payload;
+		console.log(payload)
+
+		return this.postService.getSearchPosts(userId, text, cursor);
 	}
 
 	@MessagePattern({ cmd: "get_user_posts" })

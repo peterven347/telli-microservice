@@ -1,6 +1,6 @@
 import { MiddlewareConsumer, Module, NestModule, RequestMethod } from '@nestjs/common';
 import { ClientsModule, Transport } from '@nestjs/microservices';
-import { ChatController, LivestreamController, PostController, UserController, FilesController } from './gateway.controller';
+import { AssetLinksController, ChatController, LivestreamController, PostController, UserController, FilesController } from './gateway.controller';
 import { AuthService } from './gateway.service';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SocketModule } from '../../socket/socket.module';
@@ -25,12 +25,12 @@ import { FilesModule } from "../../fileUpload/files.module"
 		SocketModule,
 		FilesModule,
 		JwtModule.register({ secret: process.env.ACCESS_TOKEN_SECRET, signOptions: { expiresIn: '1m' }, }),
-		MongooseModule.forRoot(process.env.MONGODB_URI as string),
-		MongooseModule.forFeature([
-			{ name: Domain.name, schema: DomainSchema },
-			{ name: Sector.name, schema: SectorSchema },
-			{ name: User.name, schema: UserSchema }
-		]),
+		// MongooseModule.forRoot(process.env.MONGODB_URI as string),
+		// MongooseModule.forFeature([
+		// 	{ name: Domain.name, schema: DomainSchema },
+		// 	{ name: Sector.name, schema: SectorSchema },
+		// 	{ name: User.name, schema: UserSchema }
+		// ]),
 
 		ClientsModule.registerAsync([
 			{
@@ -79,7 +79,7 @@ import { FilesModule } from "../../fileUpload/files.module"
 			},
 		]),
 	],
-	controllers: [ChatController, LivestreamController, PostController, UserController, FilesController],
+	controllers: [ChatController, LivestreamController, PostController, UserController, FilesController, AssetLinksController ],
 	providers: [
 		{
 			provide: APP_GUARD,

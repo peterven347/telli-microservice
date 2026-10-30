@@ -1,11 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Comment, Post, Like } from './post.schema';
 import { InjectModel } from '@nestjs/mongoose';
-import { ObjectId, Model, Types } from 'mongoose';
-import { post } from 'axios';
+import { Model, PipelineStage, Types } from 'mongoose';
 import { v2 as cloudinary } from "cloudinary"
 import { ConfigService } from '@nestjs/config';
-import { timestamp } from 'rxjs';
 
 
 @Injectable()
@@ -33,16 +31,6 @@ export class PostService {
 		}
 	}
 
-	// async getPosts(userId: string, cursor?: string) {
-	// 	const query = cursor && Types.ObjectId.isValid(cursor) ? { _id: { $lt: cursor } } : {}
-	// 	const posts: any = await this.postModel
-	// 		.find(query)
-	// 		.sort({ _id: -1 })
-	// 		.limit(10)
-
-	// 	const nextPageCursor = posts.length > 0 ? posts[posts.length - 1]._id.toString() : null;
-	// 	return { posts, nextPageCursor };
-	// };
 	async getPosts(userId: string, cursor?: string) {
 		const matchStage = cursor && Types.ObjectId.isValid(cursor)
 			? { _id: { $lt: new Types.ObjectId(cursor) } }
@@ -51,7 +39,7 @@ export class PostService {
 		const posts: any = await this.postModel.aggregate([
 			{ $match: matchStage },
 			{ $sort: { _id: -1 } },
-			{ $limit: 10 },
+			{ $limit: 20 },
 			{
 				$lookup: {
 					from: 'likes',
@@ -82,6 +70,152 @@ export class PostService {
 		const nextPageCursor = posts.length > 0 ? posts[posts.length - 1]._id.toString() : null;
 		return { posts, nextPageCursor };
 	}
+
+	// async getSearchPosts(userId: string, cursor?: string, text?: string) {
+	// 	const LIMIT = 10;
+	// 	const searchText = text?.trim();
+	// 	const pipeline: PipelineStage[] = [];
+
+	// 	if (searchText) {
+	// 		pipeline.push({
+	// 			$search: {
+	// 				index: 'default',
+	// 				text: {
+	// 					query: searchText,
+	// 					path: 'text',
+	// 					fuzzy: { maxEdits: 2, prefixLength: 1 },
+	// 				},
+	// 			},
+	// 		} as PipelineStage);
+	// 	}
+
+	// 	// 2. Cursor pagination (aggregation doesn't auto-cast, so wrap in ObjectId)
+	// 	if (cursor && Types.ObjectId.isValid(cursor)) {
+	// 		pipeline.push({ $match: { _id: { $lt: new Types.ObjectId(cursor) } } });
+	// 	}
+
+	// 	pipeline.push(
+	// 		{ $sort: { _id: -1 } },
+	// 		{ $limit: LIMIT },
+	// 		{
+	// 			$lookup: {
+	// 				from: 'likes',
+	// 				let: { postId: '$_id' },
+	// 				pipeline: [
+	// 					{
+	// 						$match: {
+	// 							$expr: {
+	// 								$and: [
+	// 									{ $eq: ['$post_id', '$$postId'] },
+	// 									{ $eq: ['$creator_id', new Types.ObjectId(userId)] },
+	// 								],
+	// 							},
+	// 						},
+	// 					},
+	// 					{ $limit: 1 },
+	// 				],
+	// 				as: 'userLike',
+	// 			},
+	// 		},
+	// 		{ $addFields: { isLiked: { $gt: [{ $size: '$userLike' }, 0] } } },
+	// 		{ $project: { userLike: 0 } },
+	// 	);
+
+	// 	const posts = await this.postModel.aggregate(pipeline);
+
+	// 	// Only hand back a cursor if there might be another page
+	// 	const nextPageCursor = posts.length === LIMIT ? posts[posts.length - 1]._id.toString() : null;
+
+	// 	return { posts, nextPageCursor };
+	// }
+
+	async getSearchPosts(userId: string, text: string, cursor?: string) {
+		try {
+			const LIMIT = 10;
+			const query = text.trim();
+
+			const cursorMatch: PipelineStage[] =
+				cursor && Types.ObjectId.isValid(cursor)
+					? [{ $match: { _id: { $lt: new Types.ObjectId(cursor) } } }]
+					: [];
+
+			const searchStage = {
+				$search: {
+					index: 'default',
+					text: {
+						query,
+						path: 'text',
+						fuzzy: { maxEdits: 2, prefixLength: 1 },
+					},
+				},
+			} as PipelineStage;
+
+			// Each branch is trimmed to LIMIT before the union. The top 10 overall
+			// must come from the top 10 of each side, so this is safe and cheap.
+			const branch = (type: 'post' | 'comment'): PipelineStage[] => [
+				searchStage,
+				...cursorMatch,
+				{ $sort: { _id: -1 } },
+				{ $limit: LIMIT },
+				{ $addFields: { type } },
+			];
+
+			const results = await this.postModel.aggregate([
+				...branch('post'),
+				{
+					$unionWith: {
+						coll: this.commentModel.collection.name, // avoids guessing the pluralized name
+						pipeline: branch('comment') as any,
+					},
+				},
+				{ $sort: { _id: -1 } },
+				{ $limit: LIMIT },
+
+				// isLiked only applies to posts
+				{
+					$lookup: {
+						from: this.likeModel.collection.name,
+						let: { itemId: '$_id', itemType: '$type' },
+						pipeline: [
+							{
+								$match: {
+									$expr: {
+										$and: [
+											{ $eq: ['$$itemType', 'post'] },
+											{ $eq: ['$post_id', '$$itemId'] },
+											{ $eq: ['$creator_id', new Types.ObjectId(userId)] },
+										],
+									},
+								},
+							},
+							{ $limit: 1 },
+						],
+						as: 'userLike',
+					},
+				},
+				{
+					$addFields: {
+						isLiked: {
+							$cond: [
+								{ $eq: ['$type', 'post'] },
+								{ $gt: [{ $size: '$userLike' }, 0] },
+								'$$REMOVE', // comments don't get an isLiked field
+							],
+						},
+					},
+				},
+				{ $project: { userLike: 0 } },
+			]);
+
+			const nextPageCursor =
+				results.length === LIMIT ? results[results.length - 1]._id.toString() : null;
+
+			return { posts: results, nextPageCursor };
+		} 
+		catch (err) {
+			console.log(err)
+		}
+	};
 
 	async getUserPosts(userId: string, cursor?: string) {
 		const query = cursor && Types.ObjectId.isValid(cursor) ? { _id: { $lt: new Types.ObjectId(cursor) }, creator_id: new Types.ObjectId(userId) } : { creator_id: new Types.ObjectId(userId) }

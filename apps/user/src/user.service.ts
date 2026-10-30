@@ -1,7 +1,7 @@
 import * as bcrypt from 'bcryptjs';
 import { Injectable, NotFoundException, ConflictException, Body, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Model } from 'mongoose';
+import { Model, PipelineStage, Types } from 'mongoose';
 import { JwtService } from '@nestjs/jwt';
 import { SignOptions } from 'jsonwebtoken';
 import { InjectModel } from '@nestjs/mongoose';
@@ -58,19 +58,19 @@ export class UserService {
 		}
 	};
 
-	async testadd(value: string) {
-		const rr = await this.redisClient.call('BF.ADD', opts.key, value)
-		console.log(rr)
-	}
+	// async testadd(value: string) {
+	// 	const rr = await this.redisClient.call('BF.ADD', opts.key, value)
+	// 	console.log(rr)
+	// }
 
-	async testexist(value: string) {
-		const result = await this.redisClient.call(
-			"BF.EXISTS",
-			opts.key,
-			value,
-		);
-		console.log(result);
-	}
+	// async testexist(value: string) {
+	// 	const result = await this.redisClient.call(
+	// 		"BF.EXISTS",
+	// 		opts.key,
+	// 		value,
+	// 	);
+	// 	console.log(result);
+	// }
 
 	async refreshAccessToken(body: any) {
 		try {
@@ -104,6 +104,40 @@ export class UserService {
 		return ({ delegateList: delegateList, delegateFcmToken: delegateFcmToken })
 	};
 
+	async searchUsers(payload: any) {
+		const { userId, text } = payload
+		const limit = 15
+		const query = text?.trim();
+
+		if (!query || query.length < 2) {
+			return { users: [] };
+		}
+
+		const users = await this.userModel.aggregate([
+			{
+				$search: {
+					index: 'users_search',
+					autocomplete: {
+						query,
+						path: 'user_name',
+						fuzzy: { maxEdits: 1, prefixLength: 2 },
+					},
+				},
+			},
+			{ $match: { _id: { $ne: new Types.ObjectId(userId) } } },
+			{ $limit: limit },
+			{
+				$project: {
+					user_name: 1,
+					bio: 1,
+					score: { $meta: 'searchScore' },
+				},
+			},
+		]);
+
+		return { users };
+	};
+
 	async getUserById(id: string): Promise<User> {
 		const user = await this.userModel.findById(id)
 		if (!user) {
@@ -133,17 +167,18 @@ export class UserService {
 
 	async signUp(body: SignUpDto) {
 		const { email, user_name, password } = body
+		const userName = user_name.trim().toLowerCase()
 		const url_domain = this.configService.get<string>("URL_DOMAIN")
 		try {
 			const existingMail = await this.redisClient.exists(`PENDING_EMAILS:${email}`) || await this.userModel.exists({ email });
 			if (existingMail) return ({ success: false, message: "email already exists" });
 			// if (existingUser) throw new ConflictException('email already exists');
 
-			const userNameExists = await this.redisClient.exists(`TEMP_USERNAMES:${user_name}`) || await this.redisClient.call("BF.EXISTS", opts.key, user_name);
+			const userNameExists = await this.redisClient.exists(`TEMP_USERNAMES:${userName}`) || await this.redisClient.call("BF.EXISTS", opts.key, userName);
 			if (userNameExists) {
 				return ({ success: false, message: "user name already exists" })
 			} else {
-				await this.redisClient.set(`TEMP_USERNAMES:${user_name}`, user_name, "EX", 600);
+				await this.redisClient.set(`TEMP_USERNAMES:${userName}`, userName, "EX", 600);
 			}
 
 			const hashedPassword = await bcrypt.hash(password, 10)
@@ -155,7 +190,7 @@ export class UserService {
 			await this.redisClient.set(`PENDING_EMAILS:${email}`, JSON.stringify(newUser), "EX", 240);
 
 			const token = generateToken(this.jwtService,
-				{ id: newUser.id, email: email, userName: user_name },
+				{ id: newUser.id, email: email, userName: userName },
 				{ expiresIn: '5m' }
 			);
 			const tt = await this.mailService.sendMail(
